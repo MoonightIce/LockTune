@@ -8,6 +8,7 @@ let package = Package(
     products: [
         .library(name: "LockTuneDomain", targets: ["LockTuneDomain"]),
         .library(name: "LockTuneCore", targets: ["LockTuneCore"]),
+        .library(name: "LockTuneInfrastructure", targets: ["LockTuneInfrastructure"]),
     ],
     targets: [
         .target(name: "LockTuneDomain"),
@@ -15,9 +16,13 @@ let package = Package(
             name: "LockTuneCore",
             dependencies: ["LockTuneDomain"]
         ),
+        .target(
+            name: "LockTuneInfrastructure",
+            dependencies: ["LockTuneCore", "LockTuneDomain"]
+        ),
         .testTarget(
             name: "LockTuneCoreTests",
-            dependencies: ["LockTuneCore", "LockTuneDomain"]
+            dependencies: ["LockTuneCore", "LockTuneDomain", "LockTuneInfrastructure"]
         ),
     ]
 )

@@ -8,6 +8,7 @@ struct LockTuneApp: App {
         WindowGroup {
             ContentView(session: session)
                 .frame(minWidth: 920, minHeight: 620)
+                .task { await session.restoreMusicLibrary() }
         }
 
         MenuBarExtra("LockTune", systemImage: "music.note") {

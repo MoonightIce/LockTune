@@ -4,9 +4,9 @@ LockTune is an open-source, local-first macOS companion that combines a local
 music player with a notch-style information surface for music and upcoming
 Google Calendar meetings.
 
-The repository is in its engineering-foundation phase. The app shell and the
-first tested island-priority seam exist; audio playback, file indexing, system
-Now Playing, and Google Calendar are tracked work, not completed features.
+The repository is in active MVP development. The app shell, the first tested
+island-priority seam, and an experimental local music index are implemented.
+Audio playback, system Now Playing, and Google Calendar remain tracked work.
 
 ## Product boundaries
 
@@ -24,6 +24,8 @@ Now Playing, and Google Calendar are tracked work, not completed features.
 - App: SwiftUI application shell, menu bar entry, entitlements, localization
 - Sources/LockTuneDomain: shared domain values
 - Sources/LockTuneCore: dependency-light application rules
+- Sources/LockTuneInfrastructure: metadata, persistence, artwork cache, and
+  security-scoped folder access
 - Tests: public-seam tests for core behavior
 - docs: product, architecture, and agent guidance
 
@@ -50,11 +52,12 @@ account.
 
 ## Local acceptance music
 
-The maintainer may test against /Users/admin/Documents/Music in read-only mode.
-That directory and its contents are never committed, uploaded, logged, or used
-by CI.
+The maintainer may opt into a private local music directory for acceptance
+testing in read-only mode. Its path and contents are never committed, uploaded,
+logged, or used by CI.
 
 ## License
 
-MIT. Third-party audio components will retain their own notices and license
-requirements.
+MIT. The current indexing implementation has no third-party dependency. Any
+future playback codec dependency must retain its notices and satisfy its
+license requirements.

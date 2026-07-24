@@ -26,7 +26,8 @@
     └── Persistence
 
     Infrastructure
-    ├── SFBAudioEngineAdapter
+    ├── SystemAudioMetadataReader
+    ├── APEMetadataParser
     ├── GoogleCalendarREST
     ├── Keychain
     ├── SwiftData stores
@@ -38,10 +39,13 @@ models adapt those services to SwiftUI.
 
 ## Audio boundary
 
-Application code depends on a LockTune-owned AudioEngine protocol. The first
-implementation will adapt SFBAudioEngine for APE and the other MVP formats.
-SFBAudioEngine is the sole planned non-SPM dependency: source is pinned through
-a git submodule and built into an XCFramework by a repository script.
+Indexing depends on a LockTune-owned AudioMetadataReading protocol. AVFoundation
+reads metadata for system-supported files and a small LockTune-owned parser
+reads APE headers and APEv2 tags. No third-party codec is required for indexing.
+
+Playback will depend on a separate LockTune-owned AudioEngine protocol. Its APE
+decoder remains an explicit NAN-158 decision: any candidate must be pinned and
+its complete transitive codec license surface audited before integration.
 
 Music files are indexed in place. A Track is a logical library item and a
 TrackLocation represents an accessible file. Exact duplicate files may share a

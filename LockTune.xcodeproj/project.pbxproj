@@ -14,6 +14,8 @@
         A10000000000000000000005 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* SettingsView.swift */; };
         A10000000000000000000006 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* Localizable.xcstrings */; };
         A10000000000000000000007 /* LockTuneCore in Frameworks */ = {isa = PBXBuildFile; productRef = AC0000000000000000000001 /* LockTuneCore */; };
+        A10000000000000000000008 /* LockTuneInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = AC0000000000000000000002 /* LockTuneInfrastructure */; };
+        A10000000000000000000009 /* LockTuneDomain in Frameworks */ = {isa = PBXBuildFile; productRef = AC0000000000000000000003 /* LockTuneDomain */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -34,6 +36,8 @@
             buildActionMask = 2147483647;
             files = (
                 A10000000000000000000007 /* LockTuneCore in Frameworks */,
+                A10000000000000000000008 /* LockTuneInfrastructure in Frameworks */,
+                A10000000000000000000009 /* LockTuneDomain in Frameworks */,
             );
             runOnlyForDeploymentPostprocessing = 0;
         };
@@ -89,6 +93,8 @@
             name = LockTune;
             packageProductDependencies = (
                 AC0000000000000000000001 /* LockTuneCore */,
+                AC0000000000000000000002 /* LockTuneInfrastructure */,
+                AC0000000000000000000003 /* LockTuneDomain */,
             );
             productName = LockTune;
             productReference = A20000000000000000000009 /* LockTune.app */;
@@ -264,6 +270,16 @@
             isa = XCSwiftPackageProductDependency;
             package = AB0000000000000000000001 /* XCLocalSwiftPackageReference "." */;
             productName = LockTuneCore;
+        };
+        AC0000000000000000000002 /* LockTuneInfrastructure */ = {
+            isa = XCSwiftPackageProductDependency;
+            package = AB0000000000000000000001 /* XCLocalSwiftPackageReference "." */;
+            productName = LockTuneInfrastructure;
+        };
+        AC0000000000000000000003 /* LockTuneDomain */ = {
+            isa = XCSwiftPackageProductDependency;
+            package = AB0000000000000000000001 /* XCLocalSwiftPackageReference "." */;
+            productName = LockTuneDomain;
         };
 /* End XCSwiftPackageProductDependency section */
     };

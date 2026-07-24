@@ -13,6 +13,7 @@ public struct TrackMetadata: Equatable, Codable, Sendable {
     public var trackNumber: Int?
     public var duration: TimeInterval?
     public var artworkData: Data?
+    public var artworkCacheKey: String?
     public var status: MetadataStatus
 
     public init(
@@ -22,6 +23,7 @@ public struct TrackMetadata: Equatable, Codable, Sendable {
         trackNumber: Int? = nil,
         duration: TimeInterval? = nil,
         artworkData: Data? = nil,
+        artworkCacheKey: String? = nil,
         status: MetadataStatus
     ) {
         self.title = title
@@ -30,6 +32,7 @@ public struct TrackMetadata: Equatable, Codable, Sendable {
         self.trackNumber = trackNumber
         self.duration = duration
         self.artworkData = artworkData
+        self.artworkCacheKey = artworkCacheKey
         self.status = status
     }
 }
@@ -51,18 +54,29 @@ public struct TrackLocation: Identifiable, Equatable, Codable, Sendable {
     public let trackID: UUID
     public let url: URL
     public let format: AudioFileFormat
+    public let fileSize: Int64?
+    public let contentModificationDate: Date?
 
-    public init(trackID: UUID, url: URL, format: AudioFileFormat) {
+    public init(
+        trackID: UUID,
+        url: URL,
+        format: AudioFileFormat,
+        fileSize: Int64? = nil,
+        contentModificationDate: Date? = nil
+    ) {
         self.id = url.standardizedFileURL.path
         self.trackID = trackID
         self.url = url
         self.format = format
+        self.fileSize = fileSize
+        self.contentModificationDate = contentModificationDate
     }
 }
 
 public enum MusicScanIssueReason: String, Equatable, Codable, Sendable {
     case unreadable
     case metadataUnavailable
+    case unsupportedFormat
 }
 
 public struct MusicScanIssue: Equatable, Codable, Sendable {

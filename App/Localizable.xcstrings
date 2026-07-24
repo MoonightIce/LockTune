@@ -7,6 +7,108 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "LockTune" } }
       }
     },
+    "library.addFolder" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Add Music Folder" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "添加音乐文件夹" } }
+      }
+    },
+    "library.album" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Album" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "专辑" } }
+      }
+    },
+    "library.artist" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Artist" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "艺术家" } }
+      }
+    },
+    "library.duration" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Duration" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "时长" } }
+      }
+    },
+    "library.error.authorization" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "LockTune could not save read-only access to that folder." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "LockTune 无法保存该文件夹的只读访问权限。" } }
+      }
+    },
+    "library.error.restore" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The saved music library could not be restored." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法恢复已保存的音乐库。" } }
+      }
+    },
+    "library.error.scan" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The music scan did not finish. Your files were not changed." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "音乐扫描未完成，原始文件没有被修改。" } }
+      }
+    },
+    "library.metadataPartial" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Some metadata is missing" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "部分元数据缺失" } }
+      }
+    },
+    "library.metadataUnavailable" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Metadata unavailable" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法读取元数据" } }
+      }
+    },
+    "library.issue.metadataUnavailable" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "metadata unavailable" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法读取元数据" } }
+      }
+    },
+    "library.issue.unreadable" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "file is unreadable" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "文件不可读" } }
+      }
+    },
+    "library.issue.unsupportedFormat" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "format is not supported in this version" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "当前版本不支持此格式" } }
+      }
+    },
+    "library.issueCount" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%lld files need attention" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%lld 个文件需要处理" } }
+      }
+    },
+    "library.refresh" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Refresh Library" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "刷新音乐库" } }
+      }
+    },
+    "library.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Title" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "标题" } }
+      }
+    },
+    "library.unknown" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unknown" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未知" } }
+      }
+    },
+    "library.unknownTitle" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unknown Title" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未知标题" } }
+      }
+    },
     "menu.quit" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Quit LockTune" } },
