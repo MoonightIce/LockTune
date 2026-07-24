@@ -1,0 +1,271 @@
+// !$*UTF8*$!
+{
+    archiveVersion = 1;
+    classes = {
+    };
+    objectVersion = 77;
+    objects = {
+
+/* Begin PBXBuildFile section */
+        A10000000000000000000001 /* LockTuneApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* LockTuneApp.swift */; };
+        A10000000000000000000002 /* AppSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* AppSession.swift */; };
+        A10000000000000000000003 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* ContentView.swift */; };
+        A10000000000000000000004 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* MenuBarView.swift */; };
+        A10000000000000000000005 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* SettingsView.swift */; };
+        A10000000000000000000006 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* Localizable.xcstrings */; };
+        A10000000000000000000007 /* LockTuneCore in Frameworks */ = {isa = PBXBuildFile; productRef = AC0000000000000000000001 /* LockTuneCore */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+        A20000000000000000000001 /* LockTuneApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockTuneApp.swift; sourceTree = "<group>"; };
+        A20000000000000000000002 /* AppSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSession.swift; sourceTree = "<group>"; };
+        A20000000000000000000003 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+        A20000000000000000000004 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
+        A20000000000000000000005 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+        A20000000000000000000006 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+        A20000000000000000000007 /* LockTune.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LockTune.entitlements; sourceTree = "<group>"; };
+        A20000000000000000000008 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+        A20000000000000000000009 /* LockTune.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LockTune.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+        A30000000000000000000001 /* Frameworks */ = {
+            isa = PBXFrameworksBuildPhase;
+            buildActionMask = 2147483647;
+            files = (
+                A10000000000000000000007 /* LockTuneCore in Frameworks */,
+            );
+            runOnlyForDeploymentPostprocessing = 0;
+        };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+        A40000000000000000000001 = {
+            isa = PBXGroup;
+            children = (
+                A40000000000000000000002 /* App */,
+                A40000000000000000000003 /* Products */,
+            );
+            sourceTree = "<group>";
+        };
+        A40000000000000000000002 /* App */ = {
+            isa = PBXGroup;
+            children = (
+                A20000000000000000000001 /* LockTuneApp.swift */,
+                A20000000000000000000002 /* AppSession.swift */,
+                A20000000000000000000003 /* ContentView.swift */,
+                A20000000000000000000004 /* MenuBarView.swift */,
+                A20000000000000000000005 /* SettingsView.swift */,
+                A20000000000000000000008 /* Localizable.xcstrings */,
+                A20000000000000000000006 /* Info.plist */,
+                A20000000000000000000007 /* LockTune.entitlements */,
+            );
+            path = App;
+            sourceTree = "<group>";
+        };
+        A40000000000000000000003 /* Products */ = {
+            isa = PBXGroup;
+            children = (
+                A20000000000000000000009 /* LockTune.app */,
+            );
+            name = Products;
+            sourceTree = "<group>";
+        };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+        A50000000000000000000001 /* LockTune */ = {
+            isa = PBXNativeTarget;
+            buildConfigurationList = A90000000000000000000002 /* Build configuration list for PBXNativeTarget "LockTune" */;
+            buildPhases = (
+                A60000000000000000000001 /* Sources */,
+                A30000000000000000000001 /* Frameworks */,
+                A70000000000000000000001 /* Resources */,
+            );
+            buildRules = (
+            );
+            dependencies = (
+            );
+            name = LockTune;
+            packageProductDependencies = (
+                AC0000000000000000000001 /* LockTuneCore */,
+            );
+            productName = LockTune;
+            productReference = A20000000000000000000009 /* LockTune.app */;
+            productType = "com.apple.product-type.application";
+        };
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+        A80000000000000000000001 /* Project object */ = {
+            isa = PBXProject;
+            attributes = {
+                BuildIndependentTargetsInParallel = 1;
+                LastSwiftUpdateCheck = 2660;
+                LastUpgradeCheck = 2660;
+                TargetAttributes = {
+                    A50000000000000000000001 = {
+                        CreatedOnToolsVersion = 26.6;
+                    };
+                };
+            };
+            buildConfigurationList = A90000000000000000000001 /* Build configuration list for PBXProject "LockTune" */;
+            developmentRegion = en;
+            hasScannedForEncodings = 0;
+            knownRegions = (
+                en,
+                "zh-Hans",
+                Base,
+            );
+            mainGroup = A40000000000000000000001;
+            minimizedProjectReferenceProxies = 1;
+            packageReferences = (
+                AB0000000000000000000001 /* XCLocalSwiftPackageReference "." */,
+            );
+            preferredProjectObjectVersion = 77;
+            productRefGroup = A40000000000000000000003 /* Products */;
+            projectDirPath = "";
+            projectRoot = "";
+            targets = (
+                A50000000000000000000001 /* LockTune */,
+            );
+        };
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+        A70000000000000000000001 /* Resources */ = {
+            isa = PBXResourcesBuildPhase;
+            buildActionMask = 2147483647;
+            files = (
+                A10000000000000000000006 /* Localizable.xcstrings in Resources */,
+            );
+            runOnlyForDeploymentPostprocessing = 0;
+        };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+        A60000000000000000000001 /* Sources */ = {
+            isa = PBXSourcesBuildPhase;
+            buildActionMask = 2147483647;
+            files = (
+                A10000000000000000000001 /* LockTuneApp.swift in Sources */,
+                A10000000000000000000002 /* AppSession.swift in Sources */,
+                A10000000000000000000003 /* ContentView.swift in Sources */,
+                A10000000000000000000004 /* MenuBarView.swift in Sources */,
+                A10000000000000000000005 /* SettingsView.swift in Sources */,
+            );
+            runOnlyForDeploymentPostprocessing = 0;
+        };
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+        AA0000000000000000000001 /* Debug */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                CLANG_ENABLE_MODULES = YES;
+                MACOSX_DEPLOYMENT_TARGET = 14.0;
+                SDKROOT = macosx;
+                SWIFT_VERSION = 6.0;
+            };
+            name = Debug;
+        };
+        AA0000000000000000000002 /* Release */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                CLANG_ENABLE_MODULES = YES;
+                MACOSX_DEPLOYMENT_TARGET = 14.0;
+                SDKROOT = macosx;
+                SWIFT_COMPILATION_MODE = wholemodule;
+                SWIFT_OPTIMIZATION_LEVEL = "-O";
+                SWIFT_VERSION = 6.0;
+            };
+            name = Release;
+        };
+        AA0000000000000000000003 /* Debug */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                ARCHS = "$(ARCHS_STANDARD)";
+                CODE_SIGN_ENTITLEMENTS = App/LockTune.entitlements;
+                CODE_SIGN_STYLE = Automatic;
+                CURRENT_PROJECT_VERSION = 1;
+                ENABLE_HARDENED_RUNTIME = YES;
+                GENERATE_INFOPLIST_FILE = NO;
+                INFOPLIST_FILE = App/Info.plist;
+                LD_RUNPATH_SEARCH_PATHS = (
+                    "$(inherited)",
+                    "@executable_path/../Frameworks",
+                );
+                MARKETING_VERSION = 0.1.0;
+                ONLY_ACTIVE_ARCH = YES;
+                PRODUCT_BUNDLE_IDENTIFIER = app.locktune.macos;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SWIFT_EMIT_LOC_STRINGS = YES;
+                SWIFT_STRICT_CONCURRENCY = complete;
+                SWIFT_VERSION = 6.0;
+            };
+            name = Debug;
+        };
+        AA0000000000000000000004 /* Release */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                ARCHS = "$(ARCHS_STANDARD)";
+                CODE_SIGN_ENTITLEMENTS = App/LockTune.entitlements;
+                CODE_SIGN_STYLE = Automatic;
+                CURRENT_PROJECT_VERSION = 1;
+                ENABLE_HARDENED_RUNTIME = YES;
+                GENERATE_INFOPLIST_FILE = NO;
+                INFOPLIST_FILE = App/Info.plist;
+                LD_RUNPATH_SEARCH_PATHS = (
+                    "$(inherited)",
+                    "@executable_path/../Frameworks",
+                );
+                MARKETING_VERSION = 0.1.0;
+                ONLY_ACTIVE_ARCH = NO;
+                PRODUCT_BUNDLE_IDENTIFIER = app.locktune.macos;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SWIFT_EMIT_LOC_STRINGS = YES;
+                SWIFT_STRICT_CONCURRENCY = complete;
+                SWIFT_VERSION = 6.0;
+            };
+            name = Release;
+        };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+        A90000000000000000000001 /* Build configuration list for PBXProject "LockTune" */ = {
+            isa = XCConfigurationList;
+            buildConfigurations = (
+                AA0000000000000000000001 /* Debug */,
+                AA0000000000000000000002 /* Release */,
+            );
+            defaultConfigurationIsVisible = 0;
+            defaultConfigurationName = Release;
+        };
+        A90000000000000000000002 /* Build configuration list for PBXNativeTarget "LockTune" */ = {
+            isa = XCConfigurationList;
+            buildConfigurations = (
+                AA0000000000000000000003 /* Debug */,
+                AA0000000000000000000004 /* Release */,
+            );
+            defaultConfigurationIsVisible = 0;
+            defaultConfigurationName = Release;
+        };
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+        AB0000000000000000000001 /* XCLocalSwiftPackageReference "." */ = {
+            isa = XCLocalSwiftPackageReference;
+            relativePath = ".";
+        };
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+        AC0000000000000000000001 /* LockTuneCore */ = {
+            isa = XCSwiftPackageProductDependency;
+            package = AB0000000000000000000001 /* XCLocalSwiftPackageReference "." */;
+            productName = LockTuneCore;
+        };
+/* End XCSwiftPackageProductDependency section */
+    };
+    rootObject = A80000000000000000000001 /* Project object */;
+}

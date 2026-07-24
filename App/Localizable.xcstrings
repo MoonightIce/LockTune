@@ -1,0 +1,96 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "app.name" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "LockTune" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "LockTune" } }
+      }
+    },
+    "menu.quit" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Quit LockTune" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "退出 LockTune" } }
+      }
+    },
+    "placeholder.calendar" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Connect Google Calendar when you are ready." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "准备好后可连接 Google 日历。" } }
+      }
+    },
+    "placeholder.library" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose a music folder to build your local library." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "选择音乐文件夹以建立本地音乐库。" } }
+      }
+    },
+    "placeholder.nowPlaying" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Your queue and playback details will appear here." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "播放队列和详情将在这里显示。" } }
+      }
+    },
+    "player.localFirst" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Local-first music" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "本地优先音乐" } }
+      }
+    },
+    "player.nothingPlaying" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Nothing Playing" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "尚未播放" } }
+      }
+    },
+    "player.pause" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pause" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "暂停" } }
+      }
+    },
+    "player.play" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Play" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "播放" } }
+      }
+    },
+    "player.unavailable" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Playback is not implemented yet" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "播放功能尚未实现" } }
+      }
+    },
+    "settings.general" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "General" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "通用" } }
+      }
+    },
+    "settings.preview" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Music folders, Google account, island, and privacy settings arrive in their feature slices." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "音乐目录、Google 账号、灵动岛和隐私设置将在对应功能阶段加入。" } }
+      }
+    },
+    "sidebar.calendar" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Calendar" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "日历" } }
+      }
+    },
+    "sidebar.library" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Library" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "音乐库" } }
+      }
+    },
+    "sidebar.nowPlaying" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Now Playing" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在播放" } }
+      }
+    }
+  },
+  "version" : "1.0"
+}
