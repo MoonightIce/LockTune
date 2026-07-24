@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  test-and-build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test core package
+        run: swift test
+
+      - name: Build macOS app
+        run: >
+          xcodebuild
+          -project LockTune.xcodeproj
+          -scheme LockTune
+          -configuration Debug
+          -destination 'platform=macOS'
+          CODE_SIGNING_ALLOWED=NO
+          build

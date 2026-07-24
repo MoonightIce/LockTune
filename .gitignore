@@ -1,0 +1,14 @@
+.DS_Store
+.build/
+.swiftpm/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# Local-only configuration and real music used for acceptance testing.
+Config/Developer.xcconfig
+LocalMusic/
+
+# Generated third-party audio engine products.
+Vendor/SFBAudioEngine/build/
+Vendor/SFBAudioEngine/XCFrameworks/build/
