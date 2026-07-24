@@ -7,9 +7,8 @@ struct MenuBarView: View {
     var body: some View {
         Text(session.currentTrackTitle)
         Divider()
-        Button(session.isPlaying ? "player.pause" : "player.play") {
-            session.isPlaying.toggle()
-        }
+        Button("player.unavailable") {}
+            .disabled(true)
         Button("menu.quit") {
             NSApplication.shared.terminate(nil)
         }

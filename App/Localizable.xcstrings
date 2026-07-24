@@ -55,6 +55,12 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "播放" } }
       }
     },
+    "player.unavailable" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Playback is not implemented yet" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "播放功能尚未实现" } }
+      }
+    },
     "settings.general" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "General" } },

@@ -99,13 +99,9 @@ private struct PlayerBar: View {
 
             Spacer()
 
-            Button {
-                session.isPlaying.toggle()
-            } label: {
-                Image(systemName: session.isPlaying ? "pause.fill" : "play.fill")
-            }
+            Button("player.unavailable", systemImage: "play.fill") {}
             .buttonStyle(.borderless)
-            .accessibilityLabel(session.isPlaying ? "player.pause" : "player.play")
+            .disabled(true)
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 12)
