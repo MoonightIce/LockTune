@@ -163,6 +163,54 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "本地优先音乐" } }
       }
     },
+    "player.error.audioOutputUnavailable" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Audio output is unavailable." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "音频输出当前不可用。" } }
+      }
+    },
+    "player.error.cannotOpen" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This track could not be opened." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法打开此音乐文件。" } }
+      }
+    },
+    "player.error.decodingFailed" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Playback stopped because decoding failed." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "解码失败，播放已停止。" } }
+      }
+    },
+    "player.next" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Next" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "下一首" } }
+      }
+    },
+    "player.playSelected" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Play Selected" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "播放所选音乐" } }
+      }
+    },
+    "player.previous" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Previous" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上一首" } }
+      }
+    },
+    "player.retry" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Retry" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重试" } }
+      }
+    },
+    "player.skip" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Skip" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "跳过" } }
+      }
+    },
     "player.nothingPlaying" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Nothing Playing" } },

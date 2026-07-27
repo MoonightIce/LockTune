@@ -10,6 +10,12 @@ let package = Package(
         .library(name: "LockTuneCore", targets: ["LockTuneCore"]),
         .library(name: "LockTuneInfrastructure", targets: ["LockTuneInfrastructure"]),
     ],
+    dependencies: [
+        .package(
+            url: "https://github.com/sbooth/CXXMonkeysAudio",
+            revision: "a33138a7bff0ef65dfa67f2a25463e201d7dff64"
+        ),
+    ],
     targets: [
         .target(name: "LockTuneDomain"),
         .target(
@@ -17,8 +23,16 @@ let package = Package(
             dependencies: ["LockTuneDomain"]
         ),
         .target(
+            name: "LockTuneAPEBridge",
+            dependencies: [
+                .product(name: "MAC", package: "CXXMonkeysAudio"),
+            ],
+            publicHeadersPath: "include",
+            cxxSettings: [.define("PLATFORM_APPLE")]
+        ),
+        .target(
             name: "LockTuneInfrastructure",
-            dependencies: ["LockTuneCore", "LockTuneDomain"]
+            dependencies: ["LockTuneCore", "LockTuneDomain", "LockTuneAPEBridge"]
         ),
         .testTarget(
             name: "LockTuneCoreTests",

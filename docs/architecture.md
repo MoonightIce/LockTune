@@ -43,9 +43,17 @@ Indexing depends on a LockTune-owned AudioMetadataReading protocol. AVFoundation
 reads metadata for system-supported files and a small LockTune-owned parser
 reads APE headers and APEv2 tags. No third-party codec is required for indexing.
 
-Playback will depend on a separate LockTune-owned AudioEngine protocol. Its APE
-decoder remains an explicit NAN-158 decision: any candidate must be pinned and
-its complete transitive codec license surface audited before integration.
+Playback depends on a separate LockTune-owned AudioEngine protocol. System
+formats use AVFAudio. APE playback uses a minimal C++ bridge to CXXMonkeysAudio,
+pinned to commit `a33138a7bff0ef65dfa67f2a25463e201d7dff64`. The dependency is
+3-clause BSD licensed and its complete notice is preserved in
+`THIRD_PARTY_NOTICES.md`. No SFBAudioEngine binary or LGPL codec is linked.
+
+PlaybackController owns queue transitions and publishes immutable snapshots to
+the UI. SystemAudioEngine creates its AVAudioEngine graph only when playback
+starts, so indexing and decode validation do not require an active output
+device. Security-scoped folder access stays active for the app session so a
+track remains readable after scanning and across window, lock, and wake events.
 
 Music files are indexed in place. A Track is a logical library item and a
 TrackLocation represents an accessible file. Exact duplicate files may share a

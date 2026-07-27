@@ -1,0 +1,14 @@
+{
+  "originHash" : "df5ba25706ecd2f0929c2b745f7ae81050bee0804accb11901d8eafbb9dc21f3",
+  "pins" : [
+    {
+      "identity" : "cxxmonkeysaudio",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/sbooth/CXXMonkeysAudio",
+      "state" : {
+        "revision" : "a33138a7bff0ef65dfa67f2a25463e201d7dff64"
+      }
+    }
+  ],
+  "version" : 3
+}

@@ -29,11 +29,7 @@ struct ContentView: View {
         case .library:
             MusicLibraryView(session: session)
         case .nowPlaying:
-            PlaceholderView(
-                title: "sidebar.nowPlaying",
-                systemImage: "play.circle",
-                message: "placeholder.nowPlaying"
-            )
+            NowPlayingView(session: session)
         case .calendar:
             PlaceholderView(
                 title: "sidebar.calendar",
@@ -46,6 +42,7 @@ struct ContentView: View {
 
 private struct MusicLibraryView: View {
     @Bindable var session: AppSession
+    @State private var selectedTrackID: Track.ID?
 
     var body: some View {
         Group {
@@ -60,7 +57,7 @@ private struct MusicLibraryView: View {
                     }
                 }
             } else {
-                Table(sortedTracks) {
+                Table(sortedTracks, selection: $selectedTrackID) {
                     TableColumn("library.title") { track in
                         HStack(spacing: 8) {
                             artwork(track)
@@ -74,6 +71,10 @@ private struct MusicLibraryView: View {
                                         .foregroundStyle(track.metadata.status == .unavailable ? .red : .secondary)
                                 }
                             }
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture(count: 2) {
+                            Task { await session.play(trackID: track.id) }
                         }
                     }
                     TableColumn("library.artist") { track in
@@ -99,6 +100,11 @@ private struct MusicLibraryView: View {
         .toolbar {
             ToolbarItemGroup {
                 if session.isScanningMusic { ProgressView().controlSize(.small) }
+                Button("player.playSelected", systemImage: "play.fill") {
+                    guard let selectedTrackID else { return }
+                    Task { await session.play(trackID: selectedTrackID) }
+                }
+                .disabled(selectedTrackID == nil || session.isScanningMusic)
                 Button("library.refresh", systemImage: "arrow.clockwise") {
                     Task { await session.scanMusicFolders() }
                 }
@@ -188,6 +194,57 @@ private struct MusicLibraryView: View {
     }
 }
 
+private struct NowPlayingView: View {
+    @Bindable var session: AppSession
+
+    var body: some View {
+        Group {
+            if session.playback.queue.isEmpty {
+                ContentUnavailableView(
+                    "sidebar.nowPlaying",
+                    systemImage: "play.circle",
+                    description: Text("placeholder.nowPlaying")
+                )
+            } else {
+                List(Array(session.playback.queue.enumerated()), id: \.element.id) { index, item in
+                    HStack(spacing: 12) {
+                        Image(systemName: index == session.playback.currentIndex
+                              ? playbackIndicator
+                              : "music.note")
+                            .foregroundStyle(
+                                index == session.playback.currentIndex
+                                    ? Color.accentColor
+                                    : Color.secondary
+                            )
+                            .frame(width: 22)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.title)
+                                .fontWeight(index == session.playback.currentIndex ? .semibold : .regular)
+                            Text(item.artist ?? String(localized: "library.unknown"))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Text(formatDuration(item.duration))
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture(count: 2) {
+                        Task { await session.playQueueItem(at: index) }
+                    }
+                    .accessibilityAddTraits(index == session.playback.currentIndex ? .isSelected : [])
+                }
+            }
+        }
+        .navigationTitle("sidebar.nowPlaying")
+    }
+
+    private var playbackIndicator: String {
+        session.playback.phase == .playing ? "speaker.wave.2.fill" : "pause.fill"
+    }
+}
+
 private enum SidebarItem: String, CaseIterable, Identifiable {
     case library
     case nowPlaying
@@ -224,28 +281,148 @@ private struct PlaceholderView: View {
 
 private struct PlayerBar: View {
     @Bindable var session: AppSession
+    @State private var pendingSeek: Double = 0
+    @State private var isSeeking = false
 
     var body: some View {
-        HStack(spacing: 14) {
-            Image(systemName: "music.note")
-                .frame(width: 42, height: 42)
-                .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(session.currentTrackTitle)
-                    .font(.headline)
-                Text("player.localFirst")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+        VStack(spacing: 7) {
+            if let failureReason = session.playback.failureReason {
+                HStack {
+                    Label(failureLabel(failureReason), systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                    Spacer()
+                    Button("player.skip") { Task { await session.playNext() } }
+                    Button("player.retry") { Task { await session.retryPlayback() } }
+                }
+                .font(.callout)
             }
 
-            Spacer()
+            HStack(spacing: 14) {
+                artwork
 
-            Button("player.unavailable", systemImage: "play.fill") {}
-                .buttonStyle(.borderless)
-                .disabled(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(session.currentTrackTitle)
+                        .font(.headline)
+                        .lineLimit(1)
+                    Text(session.playback.currentItem?.artist ?? String(localized: "player.localFirst"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .frame(width: 180, alignment: .leading)
+
+                Button("player.previous", systemImage: "backward.fill") {
+                    Task { await session.playPrevious() }
+                }
+                .labelStyle(.iconOnly)
+                .disabled(session.playback.currentItem == nil || session.playback.phase == .loading)
+
+                Button(playPauseLabel, systemImage: playPauseImage) {
+                    Task { await session.togglePlayPause() }
+                }
+                .labelStyle(.iconOnly)
+                .controlSize(.large)
+                .disabled(!canTogglePlayback)
+
+                Button("player.next", systemImage: "forward.fill") {
+                    Task { await session.playNext() }
+                }
+                .labelStyle(.iconOnly)
+                .disabled(session.playback.currentItem == nil || session.playback.phase == .loading)
+
+                Text(formatDuration(displayedElapsed))
+                    .font(.caption)
+                    .monospacedDigit()
+                    .frame(width: 42, alignment: .trailing)
+
+                Slider(
+                    value: seekBinding,
+                    in: 0...max(session.playback.duration ?? 0, 1),
+                    onEditingChanged: seekEditingChanged
+                )
+                .disabled(session.playback.currentItem == nil || session.playback.duration == nil)
+
+                Text(formatDuration(session.playback.duration))
+                    .font(.caption)
+                    .monospacedDigit()
+                    .frame(width: 42, alignment: .leading)
+
+                Image(systemName: "speaker.fill")
+                    .foregroundStyle(.secondary)
+                Slider(
+                    value: Binding(
+                        get: { Double(session.playback.volume) },
+                        set: { value in Task { await session.setVolume(Float(value)) } }
+                    ),
+                    in: 0...1
+                )
+                .frame(width: 90)
+            }
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 12)
     }
+
+    @ViewBuilder
+    private var artwork: some View {
+        if let data = session.artworkData(for: session.playback.currentItem?.trackID),
+           let image = NSImage(data: data) {
+            Image(nsImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 46, height: 46)
+                .clipShape(RoundedRectangle(cornerRadius: 7))
+        } else {
+            Image(systemName: "music.note")
+                .frame(width: 46, height: 46)
+                .background(.quaternary, in: RoundedRectangle(cornerRadius: 7))
+        }
+    }
+
+    private var playPauseLabel: LocalizedStringKey {
+        session.playback.phase == .playing ? "player.pause" : "player.play"
+    }
+
+    private var playPauseImage: String {
+        session.playback.phase == .playing ? "pause.fill" : "play.fill"
+    }
+
+    private var canTogglePlayback: Bool {
+        session.playback.currentItem != nil && [.playing, .paused].contains(session.playback.phase)
+    }
+
+    private var displayedElapsed: Double {
+        isSeeking ? pendingSeek : session.playback.elapsed
+    }
+
+    private var seekBinding: Binding<Double> {
+        Binding(
+            get: { displayedElapsed },
+            set: { pendingSeek = $0 }
+        )
+    }
+
+    private func seekEditingChanged(_ editing: Bool) {
+        if editing {
+            pendingSeek = session.playback.elapsed
+            isSeeking = true
+        } else {
+            isSeeking = false
+            let target = pendingSeek
+            Task { await session.seek(to: target) }
+        }
+    }
+
+    private func failureLabel(_ reason: PlaybackFailureReason) -> LocalizedStringKey {
+        switch reason {
+        case .cannotOpen: "player.error.cannotOpen"
+        case .decodingFailed: "player.error.decodingFailed"
+        case .audioOutputUnavailable: "player.error.audioOutputUnavailable"
+        }
+    }
+}
+
+private func formatDuration(_ seconds: TimeInterval?) -> String {
+    guard let seconds, seconds.isFinite, seconds >= 0 else { return "—:—" }
+    return Duration.seconds(seconds).formatted(.time(pattern: .minuteSecond))
 }

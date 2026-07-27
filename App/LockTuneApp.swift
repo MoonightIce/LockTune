@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 @main
@@ -9,6 +10,13 @@ struct LockTuneApp: App {
             ContentView(session: session)
                 .frame(minWidth: 920, minHeight: 620)
                 .task { await session.restoreMusicLibrary() }
+                .onReceive(
+                    NSWorkspace.shared.notificationCenter.publisher(
+                        for: NSWorkspace.didWakeNotification
+                    )
+                ) { _ in
+                    Task { await session.resumePlaybackAfterWake() }
+                }
         }
 
         MenuBarExtra("LockTune", systemImage: "music.note") {

@@ -1,9 +1,36 @@
 # Third-party notices
 
-No third-party source or binary dependency is currently vendored.
+## CXXMonkeysAudio
 
-SFBAudioEngine was evaluated for APE support but has not been integrated. Its
-top-level library is MIT licensed, while the full package can bring codec
-components with additional obligations. Before any playback dependency is
-added, the project must pin a source commit, audit every transitive codec,
-preserve required notices, and verify release-bundle linking obligations.
+Source: <https://github.com/sbooth/CXXMonkeysAudio>
+
+Pinned revision: `a33138a7bff0ef65dfa67f2a25463e201d7dff64`
+
+Monkey's Audio License Agreement (3 clause BSD)
+
+Copyright 2000-2026 Matthew T. Ashland. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+3. Neither the name of the copyright holder nor the names of its contributors
+   may be used to endorse or promote products derived from this software without
+   specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+SFBAudioEngine was evaluated but is not integrated or linked by LockTune.
