@@ -1,6 +1,7 @@
 import SwiftUI
 import LockTuneDomain
 import AppKit
+import ImageIO
 
 struct ContentView: View {
     @Bindable var session: AppSession
@@ -55,8 +56,9 @@ private struct MusicLibraryView: View {
                     }
                 }
             } else {
-                Table(sortedTracks, selection: $selectedTrackID) {
-                    TableColumn("library.title") { track in
+                Table(sortedRows, selection: $selectedTrackID) {
+                    TableColumn("library.title") { row in
+                        let track = row.track
                         HStack(spacing: 8) {
                             artwork(track)
                             Button {
@@ -83,24 +85,24 @@ private struct MusicLibraryView: View {
                             Task { await session.play(trackID: track.id) }
                         }
                     }
-                    TableColumn("library.artist") { track in
-                        Text(track.metadata.artist ?? String(localized: "library.unknown"))
+                    TableColumn("library.artist") { row in
+                        Text(row.track.metadata.artist ?? String(localized: "library.unknown"))
                     }
-                    TableColumn("library.album") { track in
-                        Text(track.metadata.album ?? String(localized: "library.unknown"))
+                    TableColumn("library.album") { row in
+                        Text(row.track.metadata.album ?? String(localized: "library.unknown"))
                     }
-                    TableColumn("library.trackNumber") { track in
-                        Text(track.metadata.trackNumber.map(String.init)
+                    TableColumn("library.trackNumber") { row in
+                        Text(row.track.metadata.trackNumber.map(String.init)
                              ?? String(localized: "library.unknown"))
                     }
                     .width(72)
-                    TableColumn("library.duration") { track in
-                        Text(duration(track.metadata.duration))
+                    TableColumn("library.duration") { row in
+                        Text(duration(row.track.metadata.duration))
                             .monospacedDigit()
                     }
                     .width(72)
-                    TableColumn("library.folder") { track in
-                        Text(folderName(for: track.id))
+                    TableColumn("library.folder") { row in
+                        Text(row.folderName)
                     }
                 }
             }
@@ -171,14 +173,25 @@ private struct MusicLibraryView: View {
         }
     }
 
-    private var sortedTracks: [Track] {
-        let matching = session.musicLibrary.tracks.filter { track in
-            let fields = [track.metadata.title, track.metadata.artist, track.metadata.album, folderName(for: track.id)]
+    private var sortedRows: [LibraryTrackRow] {
+        let folderNamesByTrackID = session.musicLibrary.locations.reduce(
+            into: [Track.ID: String]()
+        ) { result, location in
+            guard result[location.trackID] == nil else { return }
+            result[location.trackID] = location.url.deletingLastPathComponent().lastPathComponent
+        }
+        let unknownFolder = String(localized: "library.unknown")
+        let matching = session.musicLibrary.tracks.compactMap { track -> LibraryTrackRow? in
+            let folderName = folderNamesByTrackID[track.id] ?? unknownFolder
+            let fields = [track.metadata.title, track.metadata.artist, track.metadata.album, folderName]
                 .compactMap { $0 }
             let matchesSearch = searchText.isEmpty || fields.contains {
                 $0.localizedCaseInsensitiveContains(searchText)
             }
-            return matchesSearch && (browseMode != .favorites || session.favoriteTrackIDs.contains(track.id))
+            guard matchesSearch,
+                  browseMode != .favorites || session.favoriteTrackIDs.contains(track.id)
+            else { return nil }
+            return LibraryTrackRow(track: track, folderName: folderName)
         }
         return matching.sorted { lhs, rhs in
             let lhsKeys = sortKeys(for: lhs)
@@ -191,20 +204,15 @@ private struct MusicLibraryView: View {
         }
     }
 
-    private func sortKeys(for track: Track) -> [String] {
+    private func sortKeys(for row: LibraryTrackRow) -> [String] {
+        let track = row.track
         let title = track.metadata.title ?? ""
         switch browseMode {
         case .songs, .favorites: return [title]
         case .albums: return [track.metadata.album ?? "", String(format: "%06d", track.metadata.trackNumber ?? 0), title]
         case .artists: return [track.metadata.artist ?? "", track.metadata.album ?? "", title]
-        case .folders: return [folderName(for: track.id), title]
+        case .folders: return [row.folderName, title]
         }
-    }
-
-    private func folderName(for trackID: UUID) -> String {
-        session.musicLibrary.locations.first(where: { $0.trackID == trackID })?.url
-            .deletingLastPathComponent().lastPathComponent
-            ?? String(localized: "library.unknown")
     }
 
     private func duration(_ seconds: TimeInterval?) -> String {
@@ -216,7 +224,7 @@ private struct MusicLibraryView: View {
 
     @ViewBuilder
     private func artwork(_ track: Track) -> some View {
-        if let data = track.metadata.artworkData, let image = NSImage(data: data) {
+        if let image = ArtworkThumbnailCache.shared.image(for: track) {
             Image(nsImage: image)
                 .resizable()
                 .scaledToFill()
@@ -237,6 +245,44 @@ private struct MusicLibraryView: View {
         case .metadataUnavailable: String(localized: "library.issue.metadataUnavailable")
         case .unsupportedFormat: String(localized: "library.issue.unsupportedFormat")
         }
+    }
+}
+
+private struct LibraryTrackRow: Identifiable {
+    let track: Track
+    let folderName: String
+    var id: Track.ID { track.id }
+}
+
+@MainActor
+private final class ArtworkThumbnailCache {
+    static let shared = ArtworkThumbnailCache()
+
+    private let images = NSCache<NSString, NSImage>()
+
+    private init() {
+        images.countLimit = 2_000
+        images.totalCostLimit = 16 * 1_024 * 1_024
+    }
+
+    func image(for track: Track) -> NSImage? {
+        guard let data = track.metadata.artworkData, !data.isEmpty else { return nil }
+        let key = NSString(string: track.metadata.artworkCacheKey ?? track.contentFingerprint)
+        if let cached = images.object(forKey: key) { return cached }
+
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: 68,
+        ]
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
+        else { return nil }
+
+        let image = NSImage(cgImage: thumbnail, size: NSSize(width: 34, height: 34))
+        images.setObject(image, forKey: key, cost: thumbnail.bytesPerRow * thumbnail.height)
+        return image
     }
 }
 

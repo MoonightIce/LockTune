@@ -4,7 +4,7 @@ import LockTuneDomain
 import LockTuneInfrastructure
 
 @Test(
-    "Authorized real formats load and seek through one audio engine",
+    "Authorized real formats load, seek, and play through one audio engine",
     .enabled(if: ProcessInfo.processInfo.environment["LOCKTUNE_REAL_MUSIC_PATH"] != nil)
 )
 func loadsAndSeeksAuthorizedRealFormats() async throws {
@@ -20,6 +20,8 @@ func loadsAndSeeksAuthorizedRealFormats() async throws {
         let duration = try #require(source.duration)
         #expect(duration > 0)
         try await engine.seek(to: duration / 2)
+        try await engine.play()
+        await engine.pause()
         await engine.stop()
     }
 }

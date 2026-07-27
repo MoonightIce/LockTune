@@ -523,10 +523,58 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "单曲循环" } }
       }
     },
+    "settings.cancel" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Cancel" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "取消" } }
+      }
+    },
+    "settings.disconnectConfirmationMessage" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This removes the saved OAuth token and calendar cache from this Mac. You can reconnect at any time." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "这会从本机移除已保存的 OAuth 令牌和日历缓存；之后可以随时重新连接。" } }
+      }
+    },
+    "settings.disconnectConfirmationTitle" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Disconnect Google Calendar?" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "断开 Google 日历？" } }
+      }
+    },
     "settings.general" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "General" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "通用" } }
+      }
+    },
+    "settings.googleCalendar" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Google Calendar" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Google 日历" } }
+      }
+    },
+    "settings.googleCalendarConnected" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Connected with read-only access" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已连接，只读访问" } }
+      }
+    },
+    "settings.googleCalendarDescription" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Disconnecting removes the local OAuth token and cached events without modifying Google Calendar." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "断开连接只会移除本机 OAuth 令牌和事件缓存，不会修改 Google 日历。" } }
+      }
+    },
+    "settings.googleCalendarDisconnected" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Not connected" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未连接" } }
+      }
+    },
+    "settings.googleCalendarSyncing" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Syncing calendars" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在同步日历" } }
       }
     },
     "settings.islandEnabled" : {

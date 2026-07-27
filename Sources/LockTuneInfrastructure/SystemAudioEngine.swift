@@ -262,6 +262,7 @@ private final class APEPCMSource: PCMSource {
     let decoder: APEAudioDecoder
     let format: AVAudioFormat
     let totalFrames: Int64
+    private var interleavedSamples: [Float] = []
 
     init(url: URL) throws {
         decoder = try APEAudioDecoder(url: url)
@@ -269,7 +270,7 @@ private final class APEPCMSource: PCMSource {
             commonFormat: .pcmFormatFloat32,
             sampleRate: decoder.sampleRate,
             channels: AVAudioChannelCount(decoder.channelCount),
-            interleaved: true
+            interleaved: false
         ) else { throw SystemAudioEngineError.cannotDecode }
         self.format = format
         totalFrames = decoder.totalFrames
@@ -279,13 +280,26 @@ private final class APEPCMSource: PCMSource {
         guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: maximumFrames) else {
             throw SystemAudioEngineError.cannotDecode
         }
-        let buffers = UnsafeMutableAudioBufferListPointer(buffer.mutableAudioBufferList)
-        guard let data = buffers.first?.mData else { throw SystemAudioEngineError.cannotDecode }
-        let frames = try decoder.read(
-            into: data.assumingMemoryBound(to: Float.self),
-            maximumFrames: Int(maximumFrames)
-        )
+        let channelCount = Int(format.channelCount)
+        let requiredSampleCount = Int(maximumFrames) * channelCount
+        if interleavedSamples.count < requiredSampleCount {
+            interleavedSamples = [Float](repeating: 0, count: requiredSampleCount)
+        }
+        let frames = try interleavedSamples.withUnsafeMutableBufferPointer { samples in
+            guard let baseAddress = samples.baseAddress else {
+                throw SystemAudioEngineError.cannotDecode
+            }
+            return try decoder.read(into: baseAddress, maximumFrames: Int(maximumFrames))
+        }
         guard frames > 0 else { return nil }
+        guard let channelData = buffer.floatChannelData else {
+            throw SystemAudioEngineError.cannotDecode
+        }
+        for channel in 0..<channelCount {
+            for frame in 0..<frames {
+                channelData[channel][frame] = interleavedSamples[(frame * channelCount) + channel]
+            }
+        }
         buffer.frameLength = AVAudioFrameCount(frames)
         return buffer
     }
