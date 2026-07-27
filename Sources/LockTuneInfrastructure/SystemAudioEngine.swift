@@ -128,8 +128,9 @@ public actor SystemAudioEngine: AudioEngine {
                 break
             }
             scheduledBufferCount += 1
-            graph.player.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { [weak self] _ in
-                Task { await self?.bufferPlayed(generation: expectedGeneration) }
+            let engine = self
+            graph.player.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { _ in
+                Task { await engine.bufferPlayed(generation: expectedGeneration) }
             }
         }
     }
