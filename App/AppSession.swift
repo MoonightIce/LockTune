@@ -9,7 +9,6 @@ enum CalendarConnectionState: Equatable {
     case connecting
     case connected
     case syncing
-    case failed
 }
 
 @MainActor
@@ -41,10 +40,7 @@ final class AppSession {
     private let nowPlayingCenter = SystemNowPlayingCenter()
     private let googleOAuthConfiguration: GoogleOAuthConfiguration
     private let googleOAuthClient: GoogleOAuthClient
-    private let googleTokenStore = GoogleOAuthTokenStore()
-    private let googleCalendarClient = GoogleCalendarClient()
-    private let calendarCache = CalendarCache()
-    private let calendarSelectionStore = CalendarSelectionStore()
+    private let calendarSyncService: GoogleCalendarSyncService
     private let indexStore: MusicIndexStore?
     private var activeMusicFolders: [URL] = []
     private var playbackObservationTask: Task<Void, Never>?
@@ -57,9 +53,11 @@ final class AppSession {
         let islandPreference = UserDefaults.standard.object(forKey: "island.enabled") as? Bool
         isIslandEnabled = islandPreference ?? true
         let clientID = Bundle.main.object(forInfoDictionaryKey: "LockTuneGoogleClientID") as? String ?? ""
-        let oauthConfiguration = GoogleOAuthConfiguration(clientID: clientID)
+        let clientSecret = Bundle.main.object(forInfoDictionaryKey: "LockTuneGoogleClientSecret") as? String ?? ""
+        let oauthConfiguration = GoogleOAuthConfiguration(clientID: clientID, clientSecret: clientSecret)
         googleOAuthConfiguration = oauthConfiguration
         googleOAuthClient = GoogleOAuthClient(configuration: oauthConfiguration)
+        calendarSyncService = GoogleCalendarSyncService(oauthConfiguration: oauthConfiguration)
         do {
             indexStore = try MusicIndexStore()
         } catch {
@@ -69,10 +67,11 @@ final class AppSession {
     }
 
     func restoreCalendar() async {
-        calendarSnapshot = (try? await calendarCache.load()) ?? CalendarSnapshot()
-        selectedCalendarIDs = await calendarSelectionStore.load()
         do {
-            guard try await googleTokenStore.load() != nil else {
+            let localState = try await calendarSyncService.loadLocalState()
+            calendarSnapshot = localState.snapshot
+            selectedCalendarIDs = localState.selectedCalendarIDs
+            guard try await calendarSyncService.hasStoredAuthorization() else {
                 calendarConnectionState = .disconnected
                 return
             }
@@ -80,7 +79,7 @@ final class AppSession {
             await syncCalendar(forceFull: true)
             startCalendarRefreshLoopIfNeeded()
         } catch {
-            calendarConnectionState = .failed
+            calendarConnectionState = .disconnected
             calendarError = String(localized: "calendar.error.restore")
         }
     }
@@ -115,7 +114,7 @@ final class AppSession {
                 verifier: verifier,
                 redirectURI: redirectURL.absoluteString
             )
-            try await googleTokenStore.save(token)
+            try await calendarSyncService.storeAuthorization(token)
             calendarConnectionState = .connected
             await syncCalendar(forceFull: true)
             startCalendarRefreshLoopIfNeeded()
@@ -124,7 +123,7 @@ final class AppSession {
             calendarError = nil
         } catch {
             await server.stop()
-            calendarConnectionState = .failed
+            calendarConnectionState = .disconnected
             calendarError = String(localized: "calendar.error.authorization")
         }
     }
@@ -136,17 +135,17 @@ final class AppSession {
 
     func disconnectGoogleCalendar() async {
         do {
-            try await googleTokenStore.delete()
-            try await calendarCache.clear()
-            await calendarSelectionStore.clear()
+            try await calendarSyncService.disconnect()
+            calendarConnectionState = .disconnected
             calendarSnapshot = CalendarSnapshot()
             selectedCalendarIDs = []
-            calendarConnectionState = .disconnected
             calendarError = nil
             calendarRefreshTask?.cancel()
             calendarRefreshTask = nil
         } catch {
-            calendarConnectionState = .failed
+            if calendarConnectionState != .disconnected {
+                calendarConnectionState = .connected
+            }
             calendarError = String(localized: "calendar.error.disconnect")
         }
     }
@@ -159,84 +158,16 @@ final class AppSession {
         calendarConnectionState = .syncing
         calendarError = nil
         do {
-            guard var token = try await googleTokenStore.load() else {
-                calendarConnectionState = .disconnected
-                return
-            }
-            if !token.isFresh() {
-                token = try await googleOAuthClient.refresh(token)
-                try await googleTokenStore.save(token)
-            }
-            let now = Date()
-            let calendars = try await googleCalendarClient.calendars(accessToken: token.accessToken)
-            let availableIDs = Set(calendars.map(\.id))
-            selectedCalendarIDs.formIntersection(availableIDs)
-            if selectedCalendarIDs.isEmpty, let defaultCalendar = calendars.first(where: \.isPrimary) ?? calendars.first {
-                selectedCalendarIDs = [defaultCalendar.id]
-            }
-            await calendarSelectionStore.save(selectedCalendarIDs)
-
-            let start = Calendar.current.date(byAdding: .day, value: -1, to: now) ?? now
-            let end = Calendar.current.date(byAdding: .day, value: 14, to: now) ?? now
-            let syncStartedAt = Date()
-            var events = calendarSnapshot.events.filter {
-                guard let calendarID = $0.calendarID else { return false }
-                return selectedCalendarIDs.contains(calendarID) && $0.end > start && $0.start < end
-            }
-            var cursors = calendarSnapshot.lastSyncByCalendarID.filter {
-                selectedCalendarIDs.contains($0.key)
-            }
-            var fullSyncDates = calendarSnapshot.lastFullSyncByCalendarID.filter {
-                selectedCalendarIDs.contains($0.key)
-            }
-            for calendar in calendars where selectedCalendarIDs.contains(calendar.id) {
-                let lastFullSync = fullSyncDates[calendar.id]
-                let fullSyncIsRecent = lastFullSync.map {
-                    syncStartedAt.timeIntervalSince($0) < 6 * 60 * 60
-                } ?? false
-                if !forceFull, fullSyncIsRecent, let cursor = cursors[calendar.id] {
-                    let changes = try await googleCalendarClient.eventChanges(
-                        calendarID: calendar.id,
-                        calendarTitle: calendar.title,
-                        accessToken: token.accessToken,
-                        updatedSince: cursor
-                    )
-                    for change in changes {
-                        switch change {
-                        case let .remove(id):
-                            events.removeAll { $0.id == id }
-                        case let .upsert(event):
-                            events.removeAll { $0.id == event.id }
-                            if event.end > start && event.start < end { events.append(event) }
-                        }
-                    }
-                } else {
-                    events.removeAll { $0.calendarID == calendar.id }
-                    events.append(contentsOf: try await googleCalendarClient.events(
-                        calendarID: calendar.id,
-                        calendarTitle: calendar.title,
-                        accessToken: token.accessToken,
-                        from: start,
-                        to: end
-                    ))
-                    fullSyncDates[calendar.id] = syncStartedAt
-                }
-                cursors[calendar.id] = syncStartedAt
-            }
-            events.sort { $0.start < $1.start }
-            let snapshot = CalendarSnapshot(
-                events: events,
-                calendars: calendars,
-                lastSyncByCalendarID: cursors,
-                lastFullSyncByCalendarID: fullSyncDates,
-                lastSuccessfulSync: Date()
+            let result = try await calendarSyncService.sync(
+                from: calendarSnapshot,
+                selectedCalendarIDs: selectedCalendarIDs,
+                forceFull: forceFull
             )
-            try await calendarCache.save(snapshot)
-            calendarSnapshot = snapshot
+            calendarSnapshot = result.snapshot
+            selectedCalendarIDs = result.selectedCalendarIDs
             calendarConnectionState = .connected
         } catch {
-            calendarConnectionState = .failed
-            calendarError = String(localized: "calendar.error.sync")
+            await handleCalendarSyncFailure(error)
         }
     }
 
@@ -266,7 +197,7 @@ final class AppSession {
         } else {
             selectedCalendarIDs.insert(calendarID)
         }
-        await calendarSelectionStore.save(selectedCalendarIDs)
+        await calendarSyncService.saveSelection(selectedCalendarIDs)
         await syncCalendar(forceFull: true)
     }
 
@@ -479,7 +410,7 @@ final class AppSession {
     }
 
     private func startCalendarRefreshLoopIfNeeded() {
-        guard calendarRefreshTask == nil else { return }
+        guard calendarRefreshTask == nil, calendarConnectionState == .connected else { return }
         calendarRefreshTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(300))
@@ -487,5 +418,51 @@ final class AppSession {
                 await syncCalendar()
             }
         }
+    }
+
+    private func handleCalendarSyncFailure(_ error: Error) async {
+        if requiresCalendarReconnect(error) {
+            try? await calendarSyncService.deleteAuthorization()
+            calendarConnectionState = .disconnected
+            calendarError = String(localized: "calendar.error.authorizationExpired")
+            calendarRefreshTask?.cancel()
+            calendarRefreshTask = nil
+        } else {
+            calendarConnectionState = .connected
+            calendarError = calendarSyncErrorMessage(for: error)
+        }
+    }
+
+    private func requiresCalendarReconnect(_ error: Error) -> Bool {
+        if GoogleAuthorizationFailure.requiresReconnect(error) { return true }
+        guard let syncError = error as? GoogleCalendarSyncServiceError else { return false }
+        if case .missingAuthorization = syncError { return true }
+        return false
+    }
+
+    private func calendarSyncErrorMessage(for error: Error) -> String {
+        if error is URLError {
+            return String(localized: "calendar.error.network")
+        }
+        if let calendarError = error as? GoogleCalendarClientError {
+            switch calendarError {
+            case let .server(statusCode) where statusCode == 403:
+                return String(localized: "calendar.error.permission")
+            case let .server(statusCode) where statusCode == 429:
+                return String(localized: "calendar.error.rateLimited")
+            case let .server(statusCode) where statusCode >= 500:
+                return String(localized: "calendar.error.service")
+            case .invalidResponse:
+                return String(localized: "calendar.error.invalidResponse")
+            case .invalidRequest, .unauthorized, .server:
+                break
+            }
+        }
+        if let oauthError = error as? GoogleOAuthError,
+           case let .tokenRequestFailed(statusCode) = oauthError,
+           statusCode >= 500 {
+            return String(localized: "calendar.error.service")
+        }
+        return String(localized: "calendar.error.sync")
     }
 }

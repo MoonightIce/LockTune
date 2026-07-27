@@ -4,7 +4,10 @@ import LockTuneInfrastructure
 
 @Test("Google OAuth authorization request uses PKCE and the narrow read-only event scope")
 func buildsGoogleOAuthAuthorizationURL() throws {
-    let configuration = GoogleOAuthConfiguration(clientID: "desktop-client.apps.googleusercontent.com")
+    let configuration = GoogleOAuthConfiguration(
+        clientID: "desktop-client.apps.googleusercontent.com",
+        clientSecret: "desktop-client-secret"
+    )
     let url = try #require(configuration.authorizationURL(
         redirectURI: "http://127.0.0.1:49152/callback",
         state: "state-value",
@@ -24,9 +27,30 @@ func buildsGoogleOAuthAuthorizationURL() throws {
         "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
     ])
     #expect(query["access_type"] == "offline")
+    #expect(Set((query["prompt"] ?? "").split(separator: " ").map(String.init)) == ["consent", "select_account"])
+    #expect(query["client_secret"] == nil)
     #expect(query["code_challenge_method"] == "S256")
     #expect(query["code_challenge"] == "challenge-value")
     #expect(query["state"] == "state-value")
+}
+
+@Test("Google OAuth requires both desktop client credentials")
+func validatesGoogleOAuthConfiguration() {
+    #expect(GoogleOAuthConfiguration(clientID: "client", clientSecret: "secret").isConfigured)
+    #expect(!GoogleOAuthConfiguration(clientID: "client", clientSecret: "").isConfigured)
+    #expect(!GoogleOAuthConfiguration(clientID: "", clientSecret: "secret").isConfigured)
+}
+
+@Test("Only revoked or rejected Google authorization requires reconnecting")
+func classifiesGoogleAuthorizationFailures() {
+    #expect(GoogleAuthorizationFailure.requiresReconnect(GoogleCalendarClientError.unauthorized))
+    #expect(GoogleAuthorizationFailure.requiresReconnect(
+        GoogleOAuthError.tokenRequestFailed(statusCode: 400)
+    ))
+    #expect(!GoogleAuthorizationFailure.requiresReconnect(
+        GoogleOAuthError.tokenRequestFailed(statusCode: 500)
+    ))
+    #expect(!GoogleAuthorizationFailure.requiresReconnect(URLError(.notConnectedToInternet)))
 }
 
 @Test("PKCE challenge uses unpadded base64url SHA-256")

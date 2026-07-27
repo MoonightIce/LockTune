@@ -45,8 +45,8 @@
     },
     "calendar.configurationRequired" : {
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "A LockTune Google Desktop OAuth Client ID is required for this build." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此构建需要配置 LockTune 的 Google 桌面 OAuth Client ID。" } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "LockTune Google Desktop OAuth client credentials are required for this build." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此构建需要配置 LockTune 的 Google 桌面 OAuth 客户端凭据。" } }
       }
     },
     "calendar.connect" : {
@@ -85,6 +85,12 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Google 授权未完成。" } }
       }
     },
+    "calendar.error.authorizationExpired" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Google authorization expired or was revoked. Connect again." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Google 授权已过期或被撤销，请重新连接。" } }
+      }
+    },
     "calendar.error.disconnect" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "The saved Google authorization could not be removed." } },
@@ -93,8 +99,38 @@
     },
     "calendar.error.notConfigured" : {
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "This build has no Google OAuth Client ID." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此构建尚未配置 Google OAuth Client ID。" } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This build has no Google OAuth client credentials." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此构建尚未配置 Google OAuth 客户端凭据。" } }
+      }
+    },
+    "calendar.error.network" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Calendar sync could not reach Google. Check your network connection." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法连接 Google 同步日历，请检查网络连接。" } }
+      }
+    },
+    "calendar.error.invalidResponse" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Google returned calendar data LockTune could not read." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Google 返回了 LockTune 无法读取的日历数据。" } }
+      }
+    },
+    "calendar.error.permission" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Google rejected access to one of the selected calendars." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Google 拒绝访问某个已选日历。" } }
+      }
+    },
+    "calendar.error.rateLimited" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Google temporarily limited calendar requests. Try again later." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Google 暂时限制了日历请求，请稍后重试。" } }
+      }
+    },
+    "calendar.error.service" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Google Calendar is temporarily unavailable." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Google 日历服务暂时不可用。" } }
       }
     },
     "calendar.error.restore" : {
@@ -115,10 +151,16 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "加入 Meet" } }
       }
     },
+    "calendar.lastSync" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Last sync: %@" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上次同步：%@" } }
+      }
+    },
     "calendar.notConfigured" : {
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Google Calendar is ready after this build receives LockTune's OAuth Client ID." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "配置 LockTune 的 OAuth Client ID 后即可连接 Google 日历。" } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Google Calendar is ready after this build receives LockTune's OAuth client credentials." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "配置 LockTune 的 OAuth 客户端凭据后即可连接 Google 日历。" } }
       }
     },
     "calendar.noUpcomingEvents" : {

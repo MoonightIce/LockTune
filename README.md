@@ -7,7 +7,7 @@ Google Calendar meetings.
 The repository is in active MVP development. Local music indexing and playback,
 APE decoding, search, favorites, persistent queue modes, system Now Playing,
 Google Calendar/Meet, and the island window are implemented. A real Google
-account flow still requires LockTune's release Desktop OAuth Client ID to be
+account flow requires LockTune's release Desktop OAuth client credentials to be
 configured in the build.
 
 ## Product boundaries

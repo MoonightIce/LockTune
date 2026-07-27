@@ -411,12 +411,21 @@ private struct CalendarView: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            if let error = session.calendarError {
-                HStack {
-                    Label(error, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
-                    if session.calendarSnapshot.lastSuccessfulSync != nil {
+            if session.calendarError != nil || session.calendarSnapshot.lastSuccessfulSync != nil {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        if let error = session.calendarError {
+                            Label(error, systemImage: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.red)
+                        }
                         Spacer()
+                        if let lastSync = session.calendarSnapshot.lastSuccessfulSync {
+                            Label(lastSyncLabel(lastSync), systemImage: "clock")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    if session.calendarError != nil,
+                       session.calendarSnapshot.lastSuccessfulSync != nil {
                         Text("calendar.offlineCache")
                             .foregroundStyle(.secondary)
                     }
@@ -430,8 +439,8 @@ private struct CalendarView: View {
     }
 
     private var isConnected: Bool {
-        session.calendarConnectionState != .disconnected
-            && session.calendarConnectionState != .connecting
+        session.calendarConnectionState == .connected
+            || session.calendarConnectionState == .syncing
     }
 
     private var calendarDescription: LocalizedStringKey {
@@ -439,6 +448,13 @@ private struct CalendarView: View {
         if session.calendarConnectionState == .connecting { return "calendar.connecting" }
         if isConnected { return "calendar.noUpcomingEvents" }
         return "placeholder.calendar"
+    }
+
+    private func lastSyncLabel(_ date: Date) -> String {
+        String(
+            format: String(localized: "calendar.lastSync"),
+            date.formatted(date: .abbreviated, time: .shortened)
+        )
     }
 
     private var groupedDays: [Date] {
@@ -461,6 +477,10 @@ private struct CalendarEventRow: View {
                     .font(.headline)
                 if !event.isAllDay {
                     Text(event.end.formatted(date: .omitted, time: .shortened))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if let allDayRange {
+                    Text(allDayRange)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -519,6 +539,14 @@ private struct CalendarEventRow: View {
         case .tentative: "questionmark.circle"
         case .needsAction, .unknown: "circle.dashed"
         }
+    }
+
+    private var allDayRange: String? {
+        let calendar = Calendar.current
+        guard let inclusiveEnd = calendar.date(byAdding: .day, value: -1, to: event.end),
+              !calendar.isDate(event.start, inSameDayAs: inclusiveEnd)
+        else { return nil }
+        return "\(event.start.formatted(date: .abbreviated, time: .omitted)) - \(inclusiveEnd.formatted(date: .abbreviated, time: .omitted))"
     }
 }
 

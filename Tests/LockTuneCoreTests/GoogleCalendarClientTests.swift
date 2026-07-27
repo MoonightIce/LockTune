@@ -63,8 +63,37 @@ func buildsBoundedCalendarRequest() throws {
     #expect(query["singleEvents"] == "true")
     #expect(query["orderBy"] == "startTime")
     #expect(query["showDeleted"] == "false")
+    #expect(query["conferenceDataVersion"] == "1")
     #expect(query["timeMin"] == "2026-07-27T00:00:00Z")
     #expect(query["timeMax"] == "2026-08-10T00:00:00Z")
+}
+
+@Test("Google Meet hangout links remain available without conference entry points")
+func decodesGoogleMeetHangoutLinkFallback() throws {
+    let data = Data(#"""
+    {
+      "items": [
+        {
+          "id": "meeting-with-hangout-link",
+          "summary": "Fallback meeting",
+          "status": "confirmed",
+          "start": { "dateTime": "2026-07-27T10:30:00+08:00" },
+          "end": { "dateTime": "2026-07-27T11:00:00+08:00" },
+          "hangoutLink": "https://meet.google.com/fallback-room",
+          "conferenceData": {
+            "entryPoints": [
+              { "entryPointType": "video", "uri": "https://example.invalid/third-party-room" }
+            ]
+          }
+        }
+      ]
+    }
+    """#.utf8)
+
+    let event = try #require(GoogleCalendarEventDecoder.decode(data).first)
+
+    #expect(event.meetURL?.host == "meet.google.com")
+    #expect(event.meetURL?.lastPathComponent == "fallback-room")
 }
 
 @Test("Calendar list response keeps readable visible calendars and primary first")
@@ -152,6 +181,7 @@ func buildsIncrementalEventRequest() throws {
     #expect(query["updatedMin"] == "2026-07-27T00:00:00Z")
     #expect(query["showDeleted"] == "true")
     #expect(query["singleEvents"] == "true")
+    #expect(query["conferenceDataVersion"] == "1")
     #expect(query["pageToken"] == "page-2")
     #expect(query["timeMin"] == nil)
 }

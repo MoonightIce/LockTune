@@ -211,6 +211,7 @@
                     "@executable_path/../Frameworks",
                 );
                 LOCKTUNE_GOOGLE_CLIENT_ID = "";
+                LOCKTUNE_GOOGLE_CLIENT_SECRET = "";
                 MARKETING_VERSION = 0.1.0;
                 ONLY_ACTIVE_ARCH = YES;
                 PRODUCT_BUNDLE_IDENTIFIER = app.locktune.macos;
@@ -237,6 +238,7 @@
                     "@executable_path/../Frameworks",
                 );
                 LOCKTUNE_GOOGLE_CLIENT_ID = "";
+                LOCKTUNE_GOOGLE_CLIENT_SECRET = "";
                 MARKETING_VERSION = 0.1.0;
                 ONLY_ACTIVE_ARCH = NO;
                 PRODUCT_BUNDLE_IDENTIFIER = app.locktune.macos;

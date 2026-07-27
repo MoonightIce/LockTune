@@ -97,13 +97,16 @@ not SwiftData. Music folder access uses security-scoped bookmarks.
 
 A loopback listener bound only to `127.0.0.1` receives the Desktop OAuth
 callback, and PKCE plus a per-request state value protect the authorization
-code flow. LockTune supplies the release Client ID and contributors may
-override it locally. URLSession calls the Calendar REST API directly with
-read-only event and calendar-list scopes. The app synchronizes on launch, wake,
-account connection, and approximately every five minutes while running. The
-initial one-day-history/fourteen-day-ahead window is paginated; later polls use
-per-calendar update cursors and merge changed or cancelled events into the
-offline cache.
+code flow. LockTune supplies release Desktop OAuth client credentials and
+contributors may override them locally. Google requires the
+Desktop client secret during token exchange, but distributed desktop secrets
+are not confidential; LockTune never treats that value as an authentication
+boundary or commits a real value. URLSession calls the Calendar REST API
+directly with read-only event and calendar-list scopes. The app synchronizes on
+launch, wake, account connection, and approximately every five minutes while
+running. The initial one-day-history/fourteen-day-ahead window is paginated;
+later polls use per-calendar update cursors and merge changed or cancelled
+events into the offline cache.
 
 ## Privacy
 

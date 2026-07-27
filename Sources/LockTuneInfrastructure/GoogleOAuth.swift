@@ -12,6 +12,19 @@ public enum GoogleOAuthError: Error, Equatable, Sendable {
     case keychain(status: OSStatus)
 }
 
+public enum GoogleAuthorizationFailure {
+    public static func requiresReconnect(_ error: Error) -> Bool {
+        if let calendarError = error as? GoogleCalendarClientError,
+           case .unauthorized = calendarError {
+            return true
+        }
+        guard let oauthError = error as? GoogleOAuthError,
+              case let .tokenRequestFailed(statusCode) = oauthError
+        else { return false }
+        return statusCode == 400 || statusCode == 401
+    }
+}
+
 public struct GoogleOAuthConfiguration: Equatable, Sendable {
     public static let calendarEventsReadOnlyScope =
         "https://www.googleapis.com/auth/calendar.events.readonly"
@@ -19,13 +32,16 @@ public struct GoogleOAuthConfiguration: Equatable, Sendable {
         "https://www.googleapis.com/auth/calendar.calendarlist.readonly"
 
     public let clientID: String
+    public let clientSecret: String
 
-    public init(clientID: String) {
+    public init(clientID: String, clientSecret: String) {
         self.clientID = clientID.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.clientSecret = clientSecret.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     public var isConfigured: Bool {
         !clientID.isEmpty && !clientID.contains("$(")
+            && !clientSecret.isEmpty && !clientSecret.contains("$(")
     }
 
     public func authorizationURL(
@@ -44,7 +60,7 @@ public struct GoogleOAuthConfiguration: Equatable, Sendable {
                 value: [Self.calendarEventsReadOnlyScope, Self.calendarListReadOnlyScope].joined(separator: " ")
             ),
             URLQueryItem(name: "access_type", value: "offline"),
-            URLQueryItem(name: "prompt", value: "consent"),
+            URLQueryItem(name: "prompt", value: "consent select_account"),
             URLQueryItem(name: "code_challenge", value: codeChallenge),
             URLQueryItem(name: "code_challenge_method", value: "S256"),
             URLQueryItem(name: "state", value: state),
@@ -144,6 +160,8 @@ public actor GoogleOAuthClient {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        var parameters = parameters
+        parameters["client_secret"] = configuration.clientSecret
         var components = URLComponents()
         components.queryItems = parameters.sorted(by: { $0.key < $1.key })
             .map { URLQueryItem(name: $0.key, value: $0.value) }

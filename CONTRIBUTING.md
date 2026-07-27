@@ -8,8 +8,9 @@ LockTune is intentionally dependency-light and local-first.
 2. Link the work to its Linear issue.
 3. Keep Google Calendar optional and music playback independent from network
    state.
-4. Do not add private macOS APIs, telemetry, user music, OAuth tokens, client
-   secrets, or private calendar data.
+4. Do not add private macOS APIs, telemetry, user music, OAuth tokens, real
+   OAuth client credential values, or private calendar data. Empty build
+   settings and local/release injection points are allowed.
 
 ## Tests
 

@@ -40,6 +40,7 @@ public enum GoogleCalendarRequest {
             URLQueryItem(name: "singleEvents", value: "true"),
             URLQueryItem(name: "orderBy", value: "startTime"),
             URLQueryItem(name: "showDeleted", value: "false"),
+            URLQueryItem(name: "conferenceDataVersion", value: "1"),
             URLQueryItem(name: "maxResults", value: "250"),
             URLQueryItem(name: "timeMin", value: formatter.string(from: start)),
             URLQueryItem(name: "timeMax", value: formatter.string(from: end)),
@@ -64,6 +65,7 @@ public enum GoogleCalendarRequest {
         components?.queryItems = [
             URLQueryItem(name: "singleEvents", value: "true"),
             URLQueryItem(name: "showDeleted", value: "true"),
+            URLQueryItem(name: "conferenceDataVersion", value: "1"),
             URLQueryItem(name: "maxResults", value: "250"),
             URLQueryItem(name: "updatedMin", value: formatter.string(from: updatedSince)),
         ]
@@ -278,9 +280,12 @@ public enum GoogleCalendarEventDecoder {
         else { return nil }
             let selfStatus = item.attendees?.first(where: { $0.isSelf == true })?.responseStatus
             let attendance = CalendarAttendanceStatus(rawValue: selfStatus ?? "") ?? .unknown
-            let meetURL = item.conferenceData?.entryPoints?
+            let conferenceURL = item.conferenceData?.entryPoints?
                 .first(where: { $0.entryPointType == "video" })
                 .flatMap { URL(string: $0.uri) }
+            let meetURL = [conferenceURL, item.hangoutLink.flatMap(URL.init(string:))]
+                .compactMap { $0 }
+                .first(where: { $0.host?.lowercased() == "meet.google.com" })
         return CalendarEvent(
                 id: calendarID.map { "\($0):\(item.id)" } ?? item.id,
                 title: item.summary ?? "",
@@ -326,6 +331,7 @@ public enum GoogleCalendarEventDecoder {
         let attendees: [Attendee]?
         let location: String?
         let htmlLink: String?
+        let hangoutLink: String?
         let conferenceData: ConferenceData?
     }
     private struct Boundary: Decodable { let dateTime: String?; let date: String? }
