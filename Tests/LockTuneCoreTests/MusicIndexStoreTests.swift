@@ -5,7 +5,7 @@ import LockTuneInfrastructure
 
 @Test("SwiftData music index round-trips tracks and locations")
 func roundTripsMusicIndex() async throws {
-    let track = IndexedTrack(
+    let track = Track(
         id: UUID(),
         contentFingerprint: "fingerprint",
         metadata: TrackMetadata(
@@ -25,7 +25,11 @@ func roundTripsMusicIndex() async throws {
         fileSize: 1_024,
         contentModificationDate: Date(timeIntervalSince1970: 1_700_000_000)
     )
-    let expected = MusicLibrarySnapshot(tracks: [track], locations: [location])
+    let expected = MusicLibrarySnapshot(
+        tracks: [track],
+        locations: [location],
+        scanState: MusicScanState(lastCompletedAt: Date(timeIntervalSince1970: 1_700_000_001))
+    )
     let store = try MusicIndexStore(inMemory: true)
 
     try await store.save(expected)

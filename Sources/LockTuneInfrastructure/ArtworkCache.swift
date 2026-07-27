@@ -14,7 +14,7 @@ public actor ArtworkCache {
         }
     }
 
-    public func persistArtwork(in track: IndexedTrack) throws -> IndexedTrack {
+    public func persistArtwork(in track: Track) throws -> Track {
         guard let data = track.metadata.artworkData, !data.isEmpty else { return track }
         try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
         let key = "\(track.contentFingerprint).artwork"

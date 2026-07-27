@@ -20,9 +20,12 @@ func readsAPEMetadata() async throws {
     #expect(metadata.status == .complete)
 }
 
-@Test("Authorized real music samples expose readable metadata and duration")
+@Test(
+    "Authorized real music samples expose readable metadata and duration",
+    .enabled(if: ProcessInfo.processInfo.environment["LOCKTUNE_REAL_MUSIC_PATH"] != nil)
+)
 func readsAuthorizedRealMusicSamples() async throws {
-    guard let path = ProcessInfo.processInfo.environment["LOCKTUNE_REAL_MUSIC_PATH"] else { return }
+    let path = try #require(ProcessInfo.processInfo.environment["LOCKTUNE_REAL_MUSIC_PATH"])
     let samples = findSamples(in: URL(fileURLWithPath: path))
     let reader = SystemAudioMetadataReader()
 

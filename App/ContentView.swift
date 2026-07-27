@@ -82,6 +82,11 @@ private struct MusicLibraryView: View {
                     TableColumn("library.album") { track in
                         Text(track.metadata.album ?? String(localized: "library.unknown"))
                     }
+                    TableColumn("library.trackNumber") { track in
+                        Text(track.metadata.trackNumber.map(String.init)
+                             ?? String(localized: "library.unknown"))
+                    }
+                    .width(72)
                     TableColumn("library.duration") { track in
                         Text(duration(track.metadata.duration))
                             .monospacedDigit()
@@ -144,19 +149,21 @@ private struct MusicLibraryView: View {
         }
     }
 
-    private var sortedTracks: [IndexedTrack] {
+    private var sortedTracks: [Track] {
         session.musicLibrary.tracks.sorted {
             ($0.metadata.title ?? "").localizedStandardCompare($1.metadata.title ?? "") == .orderedAscending
         }
     }
 
     private func duration(_ seconds: TimeInterval?) -> String {
-        guard let seconds, seconds.isFinite, seconds >= 0 else { return "—" }
+        guard let seconds, seconds.isFinite, seconds >= 0 else {
+            return String(localized: "library.unknown")
+        }
         return Duration.seconds(seconds).formatted(.time(pattern: .minuteSecond))
     }
 
     @ViewBuilder
-    private func artwork(_ track: IndexedTrack) -> some View {
+    private func artwork(_ track: Track) -> some View {
         if let data = track.metadata.artworkData, let image = NSImage(data: data) {
             Image(nsImage: image)
                 .resizable()
@@ -164,9 +171,11 @@ private struct MusicLibraryView: View {
                 .frame(width: 34, height: 34)
                 .clipShape(RoundedRectangle(cornerRadius: 5))
         } else {
-            Image(systemName: "music.note")
+            Image(systemName: "questionmark")
                 .frame(width: 34, height: 34)
                 .background(.quaternary, in: RoundedRectangle(cornerRadius: 5))
+                .accessibilityLabel(Text("library.artworkUnknown"))
+                .help("library.artworkUnknown")
         }
     }
 

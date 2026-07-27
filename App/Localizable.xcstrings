@@ -25,6 +25,12 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "艺术家" } }
       }
     },
+    "library.artworkUnknown" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unknown artwork" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未知封面" } }
+      }
+    },
     "library.duration" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Duration" } },
@@ -37,6 +43,12 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "LockTune 无法保存该文件夹的只读访问权限。" } }
       }
     },
+    "library.error.indexUnavailable" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The local music index is unavailable. No scan result was saved." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "本地音乐索引不可用，本次扫描结果未保存。" } }
+      }
+    },
     "library.error.restore" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "The saved music library could not be restored." } },
@@ -47,6 +59,12 @@
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "The music scan did not finish. Your files were not changed." } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "音乐扫描未完成，原始文件没有被修改。" } }
+      }
+    },
+    "library.error.someFoldersUnavailable" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Some music folders could not be accessed. Their existing index entries were kept." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "部分音乐文件夹无法访问，已有索引内容已保留。" } }
       }
     },
     "library.metadataPartial" : {
@@ -95,6 +113,12 @@
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Title" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "标题" } }
+      }
+    },
+    "library.trackNumber" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Track" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "音轨" } }
       }
     },
     "library.unknown" : {

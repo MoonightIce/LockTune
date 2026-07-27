@@ -6,7 +6,7 @@ public protocol AudioMetadataReading: Sendable {
     func metadata(for url: URL, format: AudioFileFormat) async -> TrackMetadata
 }
 
-public struct MusicLibraryScanner: Sendable {
+public actor MusicLibraryScanner {
     private let metadataReader: any AudioMetadataReading
 
     public init(metadataReader: any AudioMetadataReading) {
@@ -25,7 +25,8 @@ public struct MusicLibraryScanner: Sendable {
         var snapshot = MusicLibrarySnapshot(
             tracks: previous.tracks.filter { retainedTrackIDs.contains($0.id) },
             locations: retainedLocations,
-            issues: previous.issues.filter { !isInside($0.url, roots: roots) }
+            issues: previous.issues.filter { !isInside($0.url, roots: roots) },
+            scanState: previous.scanState
         )
         var tracksByFingerprint = Dictionary(
             uniqueKeysWithValues: previous.tracks.map { ($0.contentFingerprint, $0) }
@@ -41,13 +42,13 @@ public struct MusicLibraryScanner: Sendable {
                    existingLocation.fileSize == file.fileSize,
                    existingLocation.contentModificationDate == file.contentModificationDate,
                    let existingTrack = previousTracksByID[existingLocation.trackID] {
-                    if includedTrackIDs.insert(existingTrack.id).inserted {
-                        snapshot.tracks.append(existingTrack)
-                    }
-                    snapshot.locations.append(existingLocation)
-                    if existingTrack.metadata.status == .unavailable {
-                        snapshot.issues.append(MusicScanIssue(url: file.url, reason: .metadataUnavailable))
-                    }
+                    append(
+                        existingTrack,
+                        at: existingLocation,
+                        issueURL: file.url,
+                        to: &snapshot,
+                        includedTrackIDs: &includedTrackIDs
+                    )
                     continue
                 }
 
@@ -59,13 +60,13 @@ public struct MusicLibraryScanner: Sendable {
                 }
 
                 if let track = tracksByFingerprint[fingerprint] {
-                    if includedTrackIDs.insert(track.id).inserted {
-                        snapshot.tracks.append(track)
-                    }
-                    snapshot.locations.append(file.location(trackID: track.id))
-                    if track.metadata.status == .unavailable {
-                        snapshot.issues.append(MusicScanIssue(url: fileURL, reason: .metadataUnavailable))
-                    }
+                    append(
+                        track,
+                        at: file.location(trackID: track.id),
+                        issueURL: fileURL,
+                        to: &snapshot,
+                        includedTrackIDs: &includedTrackIDs
+                    )
                     continue
                 }
 
@@ -73,7 +74,7 @@ public struct MusicLibraryScanner: Sendable {
                 if metadata.status == .unavailable {
                     snapshot.issues.append(MusicScanIssue(url: fileURL, reason: .metadataUnavailable))
                 }
-                let track = IndexedTrack(contentFingerprint: fingerprint, metadata: metadata)
+                let track = Track(contentFingerprint: fingerprint, metadata: metadata)
                 tracksByFingerprint[fingerprint] = track
                 includedTrackIDs.insert(track.id)
                 snapshot.tracks.append(track)
@@ -82,6 +83,22 @@ public struct MusicLibraryScanner: Sendable {
         }
 
         return snapshot
+    }
+
+    private func append(
+        _ track: Track,
+        at location: TrackLocation,
+        issueURL: URL,
+        to snapshot: inout MusicLibrarySnapshot,
+        includedTrackIDs: inout Set<UUID>
+    ) {
+        if includedTrackIDs.insert(track.id).inserted {
+            snapshot.tracks.append(track)
+        }
+        snapshot.locations.append(location)
+        if track.metadata.status == .unavailable {
+            snapshot.issues.append(MusicScanIssue(url: issueURL, reason: .metadataUnavailable))
+        }
     }
 
     private func contentFingerprint(for url: URL) -> String? {

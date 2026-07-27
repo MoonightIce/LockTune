@@ -129,9 +129,12 @@ func reportsUnsupportedAudioFormat() async throws {
     #expect(snapshot.issues.map(\.reason) == [.unsupportedFormat])
 }
 
-@Test("Authorized real library completes full and incremental scans")
+@Test(
+    "Authorized real library completes full and incremental scans",
+    .enabled(if: ProcessInfo.processInfo.environment["LOCKTUNE_REAL_MUSIC_PATH"] != nil)
+)
 func scansAuthorizedRealLibrary() async throws {
-    guard let path = ProcessInfo.processInfo.environment["LOCKTUNE_REAL_MUSIC_PATH"] else { return }
+    let path = try #require(ProcessInfo.processInfo.environment["LOCKTUNE_REAL_MUSIC_PATH"])
     let folder = URL(fileURLWithPath: path)
     let expectedLocationCount = countSupportedFiles(in: folder)
     let scanner = MusicLibraryScanner(metadataReader: SystemAudioMetadataReader())

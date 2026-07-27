@@ -9,7 +9,7 @@ func persistsArtworkSeparately() async throws {
         .appending(path: UUID().uuidString, directoryHint: .isDirectory)
     defer { try? FileManager.default.removeItem(at: root) }
     let artwork = Data([1, 2, 3, 4])
-    let track = IndexedTrack(
+    let track = Track(
         contentFingerprint: "abc123",
         metadata: TrackMetadata(artworkData: artwork, status: .partial)
     )

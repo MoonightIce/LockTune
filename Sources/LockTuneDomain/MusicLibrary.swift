@@ -37,7 +37,7 @@ public struct TrackMetadata: Equatable, Codable, Sendable {
     }
 }
 
-public struct IndexedTrack: Identifiable, Equatable, Codable, Sendable {
+public struct Track: Identifiable, Equatable, Codable, Sendable {
     public let id: UUID
     public let contentFingerprint: String
     public var metadata: TrackMetadata
@@ -89,18 +89,29 @@ public struct MusicScanIssue: Equatable, Codable, Sendable {
     }
 }
 
+public struct MusicScanState: Equatable, Codable, Sendable {
+    public var lastCompletedAt: Date?
+
+    public init(lastCompletedAt: Date? = nil) {
+        self.lastCompletedAt = lastCompletedAt
+    }
+}
+
 public struct MusicLibrarySnapshot: Equatable, Codable, Sendable {
-    public var tracks: [IndexedTrack]
+    public var tracks: [Track]
     public var locations: [TrackLocation]
     public var issues: [MusicScanIssue]
+    public var scanState: MusicScanState
 
     public init(
-        tracks: [IndexedTrack] = [],
+        tracks: [Track] = [],
         locations: [TrackLocation] = [],
-        issues: [MusicScanIssue] = []
+        issues: [MusicScanIssue] = [],
+        scanState: MusicScanState = MusicScanState()
     ) {
         self.tracks = tracks
         self.locations = locations
         self.issues = issues
+        self.scanState = scanState
     }
 }

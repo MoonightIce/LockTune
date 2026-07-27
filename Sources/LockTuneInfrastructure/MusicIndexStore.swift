@@ -14,7 +14,7 @@ private final class StoredTrack {
     var artworkCacheKey: String?
     var metadataStatus: String
 
-    init(_ track: IndexedTrack) {
+    init(_ track: Track) {
         id = track.id
         contentFingerprint = track.contentFingerprint
         title = track.metadata.title
@@ -26,8 +26,8 @@ private final class StoredTrack {
         metadataStatus = track.metadata.status.rawValue
     }
 
-    var domain: IndexedTrack {
-        IndexedTrack(
+    var domain: Track {
+        Track(
             id: id,
             contentFingerprint: contentFingerprint,
             metadata: TrackMetadata(
@@ -89,11 +89,31 @@ private final class StoredScanIssue {
     }
 }
 
+@Model
+private final class StoredMusicIndexState {
+    @Attribute(.unique) var id: String
+    var lastCompletedAt: Date?
+
+    init(_ state: MusicScanState) {
+        id = "music-index"
+        lastCompletedAt = state.lastCompletedAt
+    }
+
+    var domain: MusicScanState {
+        MusicScanState(lastCompletedAt: lastCompletedAt)
+    }
+}
+
 public actor MusicIndexStore {
     private let container: ModelContainer
 
     public init(inMemory: Bool = false) throws {
-        let schema = Schema([StoredTrack.self, StoredTrackLocation.self, StoredScanIssue.self])
+        let schema = Schema([
+            StoredTrack.self,
+            StoredTrackLocation.self,
+            StoredScanIssue.self,
+            StoredMusicIndexState.self,
+        ])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory)
         container = try ModelContainer(for: schema, configurations: [configuration])
     }
@@ -103,9 +123,11 @@ public actor MusicIndexStore {
         try context.fetch(FetchDescriptor<StoredTrack>()).forEach(context.delete)
         try context.fetch(FetchDescriptor<StoredTrackLocation>()).forEach(context.delete)
         try context.fetch(FetchDescriptor<StoredScanIssue>()).forEach(context.delete)
+        try context.fetch(FetchDescriptor<StoredMusicIndexState>()).forEach(context.delete)
         snapshot.tracks.map(StoredTrack.init).forEach(context.insert)
         snapshot.locations.map(StoredTrackLocation.init).forEach(context.insert)
         snapshot.issues.map(StoredScanIssue.init).forEach(context.insert)
+        context.insert(StoredMusicIndexState(snapshot.scanState))
         try context.save()
     }
 
@@ -114,6 +136,13 @@ public actor MusicIndexStore {
         let tracks = try context.fetch(FetchDescriptor<StoredTrack>()).map(\.domain)
         let locations = try context.fetch(FetchDescriptor<StoredTrackLocation>()).compactMap(\.domain)
         let issues = try context.fetch(FetchDescriptor<StoredScanIssue>()).compactMap(\.domain)
-        return MusicLibrarySnapshot(tracks: tracks, locations: locations, issues: issues)
+        let scanState = try context.fetch(FetchDescriptor<StoredMusicIndexState>()).first?.domain
+            ?? MusicScanState()
+        return MusicLibrarySnapshot(
+            tracks: tracks,
+            locations: locations,
+            issues: issues,
+            scanState: scanState
+        )
     }
 }
