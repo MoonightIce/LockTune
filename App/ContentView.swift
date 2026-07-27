@@ -31,11 +31,7 @@ struct ContentView: View {
         case .nowPlaying:
             NowPlayingView(session: session)
         case .calendar:
-            PlaceholderView(
-                title: "sidebar.calendar",
-                systemImage: "calendar",
-                message: "placeholder.calendar"
-            )
+            CalendarView(session: session)
         }
     }
 }
@@ -43,6 +39,8 @@ struct ContentView: View {
 private struct MusicLibraryView: View {
     @Bindable var session: AppSession
     @State private var selectedTrackID: Track.ID?
+    @State private var searchText = ""
+    @State private var browseMode: LibraryBrowseMode = .songs
 
     var body: some View {
         Group {
@@ -61,6 +59,14 @@ private struct MusicLibraryView: View {
                     TableColumn("library.title") { track in
                         HStack(spacing: 8) {
                             artwork(track)
+                            Button {
+                                Task { await session.toggleFavorite(trackID: track.id) }
+                            } label: {
+                                Image(systemName: session.favoriteTrackIDs.contains(track.id) ? "heart.fill" : "heart")
+                                    .foregroundStyle(session.favoriteTrackIDs.contains(track.id) ? .red : .secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .help(session.favoriteTrackIDs.contains(track.id) ? "library.unfavorite" : "library.favorite")
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(track.metadata.title ?? String(localized: "library.unknownTitle"))
                                 if track.metadata.status != .complete {
@@ -93,13 +99,23 @@ private struct MusicLibraryView: View {
                             .monospacedDigit()
                     }
                     .width(72)
+                    TableColumn("library.folder") { track in
+                        Text(folderName(for: track.id))
+                    }
                 }
             }
         }
         .navigationTitle("sidebar.library")
+        .searchable(text: $searchText, prompt: "library.search")
         .toolbar {
             ToolbarItemGroup {
                 if session.isScanningMusic { ProgressView().controlSize(.small) }
+                Picker("library.browse", selection: $browseMode) {
+                    ForEach(LibraryBrowseMode.allCases) { mode in
+                        Label(mode.title, systemImage: mode.systemImage).tag(mode)
+                    }
+                }
+                .pickerStyle(.menu)
                 Button("player.playSelected", systemImage: "play.fill") {
                     guard let selectedTrackID else { return }
                     Task { await session.play(trackID: selectedTrackID) }
@@ -156,9 +172,39 @@ private struct MusicLibraryView: View {
     }
 
     private var sortedTracks: [Track] {
-        session.musicLibrary.tracks.sorted {
-            ($0.metadata.title ?? "").localizedStandardCompare($1.metadata.title ?? "") == .orderedAscending
+        let matching = session.musicLibrary.tracks.filter { track in
+            let fields = [track.metadata.title, track.metadata.artist, track.metadata.album, folderName(for: track.id)]
+                .compactMap { $0 }
+            let matchesSearch = searchText.isEmpty || fields.contains {
+                $0.localizedCaseInsensitiveContains(searchText)
+            }
+            return matchesSearch && (browseMode != .favorites || session.favoriteTrackIDs.contains(track.id))
         }
+        return matching.sorted { lhs, rhs in
+            let lhsKeys = sortKeys(for: lhs)
+            let rhsKeys = sortKeys(for: rhs)
+            for (left, right) in zip(lhsKeys, rhsKeys) {
+                let order = left.localizedStandardCompare(right)
+                if order != .orderedSame { return order == .orderedAscending }
+            }
+            return lhs.id.uuidString < rhs.id.uuidString
+        }
+    }
+
+    private func sortKeys(for track: Track) -> [String] {
+        let title = track.metadata.title ?? ""
+        switch browseMode {
+        case .songs, .favorites: return [title]
+        case .albums: return [track.metadata.album ?? "", String(format: "%06d", track.metadata.trackNumber ?? 0), title]
+        case .artists: return [track.metadata.artist ?? "", track.metadata.album ?? "", title]
+        case .folders: return [folderName(for: track.id), title]
+        }
+    }
+
+    private func folderName(for trackID: UUID) -> String {
+        session.musicLibrary.locations.first(where: { $0.trackID == trackID })?.url
+            .deletingLastPathComponent().lastPathComponent
+            ?? String(localized: "library.unknown")
     }
 
     private func duration(_ seconds: TimeInterval?) -> String {
@@ -190,6 +236,31 @@ private struct MusicLibraryView: View {
         case .unreadable: String(localized: "library.issue.unreadable")
         case .metadataUnavailable: String(localized: "library.issue.metadataUnavailable")
         case .unsupportedFormat: String(localized: "library.issue.unsupportedFormat")
+        }
+    }
+}
+
+private enum LibraryBrowseMode: String, CaseIterable, Identifiable {
+    case songs, albums, artists, folders, favorites
+    var id: Self { self }
+
+    var title: LocalizedStringKey {
+        switch self {
+        case .songs: "library.browse.songs"
+        case .albums: "library.browse.albums"
+        case .artists: "library.browse.artists"
+        case .folders: "library.browse.folders"
+        case .favorites: "library.browse.favorites"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .songs: "music.note"
+        case .albums: "square.stack"
+        case .artists: "music.mic"
+        case .folders: "folder"
+        case .favorites: "heart"
         }
     }
 }
@@ -242,6 +313,212 @@ private struct NowPlayingView: View {
 
     private var playbackIndicator: String {
         session.playback.phase == .playing ? "speaker.wave.2.fill" : "pause.fill"
+    }
+}
+
+private struct CalendarView: View {
+    @Bindable var session: AppSession
+
+    var body: some View {
+        Group {
+            if session.calendarSnapshot.events.isEmpty {
+                ContentUnavailableView {
+                    Label("sidebar.calendar", systemImage: "calendar")
+                } description: {
+                    Text(calendarDescription)
+                } actions: {
+                    if !isConnected {
+                        VStack(spacing: 8) {
+                            Button(
+                                session.calendarConnectionState == .connecting ? "calendar.cancelConnect" : "calendar.connect",
+                                systemImage: session.calendarConnectionState == .connecting ? "xmark.circle" : "person.crop.circle.badge.plus"
+                            ) {
+                                Task {
+                                    if session.calendarConnectionState == .connecting {
+                                        await session.cancelGoogleConnection()
+                                    } else {
+                                        await session.connectGoogleCalendar()
+                                    }
+                                }
+                            }
+                            .disabled(!session.isGoogleCalendarConfigured)
+                            if !session.isGoogleCalendarConfigured {
+                                Text("calendar.configurationRequired")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.center)
+                            }
+                        }
+                    }
+                }
+            } else {
+                List {
+                    ForEach(groupedDays, id: \.self) { day in
+                        Section(day.formatted(date: .complete, time: .omitted)) {
+                            ForEach(events(on: day)) { event in
+                                CalendarEventRow(event: event)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle("sidebar.calendar")
+        .toolbar {
+            ToolbarItemGroup {
+                if session.calendarConnectionState == .syncing || session.calendarConnectionState == .connecting {
+                    ProgressView().controlSize(.small)
+                }
+                Button("calendar.refresh", systemImage: "arrow.clockwise") {
+                    Task { await session.syncCalendar(forceFull: true) }
+                }
+                .disabled(!isConnected || session.calendarConnectionState == .syncing)
+                if isConnected, !session.calendarSnapshot.calendars.isEmpty {
+                    Menu("calendar.chooseCalendars", systemImage: "calendar.badge.checkmark") {
+                        ForEach(session.calendarSnapshot.calendars) { calendar in
+                            Button {
+                                Task { await session.toggleCalendarSelection(calendar.id) }
+                            } label: {
+                                Label(
+                                    calendar.title,
+                                    systemImage: session.selectedCalendarIDs.contains(calendar.id)
+                                        ? "checkmark.circle.fill"
+                                        : "circle"
+                                )
+                            }
+                            .disabled(
+                                session.selectedCalendarIDs.contains(calendar.id)
+                                    && session.selectedCalendarIDs.count == 1
+                            )
+                        }
+                    }
+                    .disabled(session.calendarConnectionState == .syncing)
+                }
+                if isConnected {
+                    Button("calendar.disconnect", systemImage: "person.crop.circle.badge.minus") {
+                        Task { await session.disconnectGoogleCalendar() }
+                    }
+                } else if session.calendarConnectionState == .connecting {
+                    Button("calendar.cancelConnect", systemImage: "xmark.circle") {
+                        Task { await session.cancelGoogleConnection() }
+                    }
+                } else {
+                    Button("calendar.connect", systemImage: "person.crop.circle.badge.plus") {
+                        Task { await session.connectGoogleCalendar() }
+                    }
+                    .disabled(!session.isGoogleCalendarConfigured || session.calendarConnectionState == .connecting)
+                }
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            if let error = session.calendarError {
+                HStack {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                    if session.calendarSnapshot.lastSuccessfulSync != nil {
+                        Spacer()
+                        Text("calendar.offlineCache")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .font(.callout)
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.bar)
+            }
+        }
+    }
+
+    private var isConnected: Bool {
+        session.calendarConnectionState != .disconnected
+            && session.calendarConnectionState != .connecting
+    }
+
+    private var calendarDescription: LocalizedStringKey {
+        if !session.isGoogleCalendarConfigured { return "calendar.notConfigured" }
+        if session.calendarConnectionState == .connecting { return "calendar.connecting" }
+        if isConnected { return "calendar.noUpcomingEvents" }
+        return "placeholder.calendar"
+    }
+
+    private var groupedDays: [Date] {
+        let calendar = Calendar.current
+        return Set(session.calendarSnapshot.events.map { calendar.startOfDay(for: $0.start) }).sorted()
+    }
+
+    private func events(on day: Date) -> [CalendarEvent] {
+        session.calendarSnapshot.events.filter { Calendar.current.isDate($0.start, inSameDayAs: day) }
+    }
+}
+
+private struct CalendarEventRow: View {
+    let event: CalendarEvent
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(event.isAllDay ? String(localized: "calendar.allDay") : event.start.formatted(date: .omitted, time: .shortened))
+                    .font(.headline)
+                if !event.isAllDay {
+                    Text(event.end.formatted(date: .omitted, time: .shortened))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(width: 70, alignment: .trailing)
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(event.title.isEmpty ? String(localized: "calendar.untitled") : event.title)
+                    .font(.headline)
+                if let organizer = event.organizer {
+                    Label(organizer, systemImage: "person")
+                }
+                if let calendarTitle = event.calendarTitle {
+                    Label(calendarTitle, systemImage: "calendar")
+                }
+                if let location = event.location {
+                    Label(location, systemImage: "mappin.and.ellipse")
+                }
+                Label(attendanceLabel, systemImage: attendanceImage)
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 7) {
+                if let meetURL = event.meetURL {
+                    Link(destination: meetURL) {
+                        Label("calendar.joinMeet", systemImage: "video.fill")
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                if let calendarURL = event.calendarURL {
+                    Link("calendar.openInGoogle", destination: calendarURL)
+                        .font(.caption)
+                }
+            }
+        }
+        .padding(.vertical, 6)
+    }
+
+    private var attendanceLabel: LocalizedStringKey {
+        switch event.attendanceStatus {
+        case .accepted: "calendar.attendance.accepted"
+        case .declined: "calendar.attendance.declined"
+        case .tentative: "calendar.attendance.tentative"
+        case .needsAction: "calendar.attendance.needsAction"
+        case .unknown: "calendar.attendance.unknown"
+        }
+    }
+
+    private var attendanceImage: String {
+        switch event.attendanceStatus {
+        case .accepted: "checkmark.circle"
+        case .declined: "xmark.circle"
+        case .tentative: "questionmark.circle"
+        case .needsAction, .unknown: "circle.dashed"
+        }
     }
 }
 
@@ -317,6 +594,17 @@ private struct PlayerBar: View {
                 .labelStyle(.iconOnly)
                 .disabled(session.playback.currentItem == nil || session.playback.phase == .loading)
 
+                Button("player.shuffle", systemImage: "shuffle") {
+                    Task {
+                        await session.setPlaybackOrder(
+                            session.playback.order == .shuffled ? .sequential : .shuffled
+                        )
+                    }
+                }
+                .labelStyle(.iconOnly)
+                .foregroundStyle(session.playback.order == .shuffled ? Color.accentColor : Color.secondary)
+                .disabled(session.playback.queue.count < 2)
+
                 Button(playPauseLabel, systemImage: playPauseImage) {
                     Task { await session.togglePlayPause() }
                 }
@@ -329,6 +617,13 @@ private struct PlayerBar: View {
                 }
                 .labelStyle(.iconOnly)
                 .disabled(session.playback.currentItem == nil || session.playback.phase == .loading)
+
+                Button(repeatLabel, systemImage: repeatImage) {
+                    Task { await session.setRepeatMode(nextRepeatMode) }
+                }
+                .labelStyle(.iconOnly)
+                .foregroundStyle(session.playback.repeatMode == .off ? Color.secondary : Color.accentColor)
+                .disabled(session.playback.queue.isEmpty)
 
                 Text(formatDuration(displayedElapsed))
                     .font(.caption)
@@ -388,7 +683,27 @@ private struct PlayerBar: View {
     }
 
     private var canTogglePlayback: Bool {
-        session.playback.currentItem != nil && [.playing, .paused].contains(session.playback.phase)
+        session.playback.currentItem != nil && [.idle, .playing, .paused].contains(session.playback.phase)
+    }
+
+    private var nextRepeatMode: PlaybackRepeatMode {
+        switch session.playback.repeatMode {
+        case .off: .all
+        case .all: .one
+        case .one: .off
+        }
+    }
+
+    private var repeatImage: String {
+        session.playback.repeatMode == .one ? "repeat.1" : "repeat"
+    }
+
+    private var repeatLabel: LocalizedStringKey {
+        switch session.playback.repeatMode {
+        case .off: "player.repeat.off"
+        case .all: "player.repeat.all"
+        case .one: "player.repeat.one"
+        }
     }
 
     private var displayedElapsed: Double {

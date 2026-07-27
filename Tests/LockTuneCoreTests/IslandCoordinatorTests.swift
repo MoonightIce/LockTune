@@ -23,3 +23,13 @@ func normalMusicOwnsTheIslandWithoutImminentMeeting() {
 
     #expect(coordinator.presentation(for: context) == .music)
 }
+
+@Test("The island is hidden when disabled or when the macOS session is inactive")
+func islandVisibilityHonorsPrivacyAndPreference() {
+    let coordinator = IslandCoordinator()
+
+    #expect(coordinator.isVisible(isEnabled: true, isSessionActive: true))
+    #expect(!coordinator.isVisible(isEnabled: false, isSessionActive: true))
+    #expect(!coordinator.isVisible(isEnabled: true, isSessionActive: false))
+    #expect(!coordinator.isVisible(isEnabled: false, isSessionActive: false))
+}

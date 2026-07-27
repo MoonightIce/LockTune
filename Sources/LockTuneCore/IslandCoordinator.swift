@@ -15,4 +15,8 @@ public struct IslandCoordinator: Sendable {
 
         return .idle
     }
+
+    public func isVisible(isEnabled: Bool, isSessionActive: Bool) -> Bool {
+        isEnabled && isSessionActive
+    }
 }

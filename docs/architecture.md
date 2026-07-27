@@ -79,6 +79,9 @@ UserData:
 
 - Favorites, queue, preferences, calendar selection, island settings
 
+Favorites, calendar selection, and island preferences use local defaults.
+Queue state is an atomically written JSON document in Application Support.
+
 MusicIndex, rebuildable:
 
 - Tracks, locations, albums, artists, scan state, artwork cache keys
@@ -92,11 +95,15 @@ not SwiftData. Music folder access uses security-scoped bookmarks.
 
 ## Google Calendar
 
-ASWebAuthenticationSession performs OAuth with PKCE. LockTune supplies the
-release Client ID and contributors may override it locally. URLSession calls
-the Calendar REST API directly. The app synchronizes on launch, wake, account
-connection, and approximately every five minutes while running. It caches one
-day of history and fourteen days ahead.
+A loopback listener bound only to `127.0.0.1` receives the Desktop OAuth
+callback, and PKCE plus a per-request state value protect the authorization
+code flow. LockTune supplies the release Client ID and contributors may
+override it locally. URLSession calls the Calendar REST API directly with
+read-only event and calendar-list scopes. The app synchronizes on launch, wake,
+account connection, and approximately every five minutes while running. The
+initial one-day-history/fourteen-day-ahead window is paginated; later polls use
+per-calendar update cursors and merge changed or cancelled events into the
+offline cache.
 
 ## Privacy
 

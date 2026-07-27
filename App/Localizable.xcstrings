@@ -7,6 +7,168 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "LockTune" } }
       }
     },
+    "calendar.allDay" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "All day" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "全天" } }
+      }
+    },
+    "calendar.attendance.accepted" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Accepted" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已接受" } }
+      }
+    },
+    "calendar.attendance.declined" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Declined" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已拒绝" } }
+      }
+    },
+    "calendar.attendance.needsAction" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Response needed" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "待回复" } }
+      }
+    },
+    "calendar.attendance.tentative" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Tentative" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "暂定" } }
+      }
+    },
+    "calendar.attendance.unknown" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No response status" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无回复状态" } }
+      }
+    },
+    "calendar.configurationRequired" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "A LockTune Google Desktop OAuth Client ID is required for this build." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此构建需要配置 LockTune 的 Google 桌面 OAuth Client ID。" } }
+      }
+    },
+    "calendar.connect" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Connect Google Calendar" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "连接 Google 日历" } }
+      }
+    },
+    "calendar.cancelConnect" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Cancel connection" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "取消连接" } }
+      }
+    },
+    "calendar.connecting" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Complete authorization in your browser." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "请在浏览器中完成授权。" } }
+      }
+    },
+    "calendar.chooseCalendars" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose calendars" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "选择日历" } }
+      }
+    },
+    "calendar.disconnect" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Disconnect Google Calendar" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "断开 Google 日历" } }
+      }
+    },
+    "calendar.error.authorization" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Google authorization did not complete." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Google 授权未完成。" } }
+      }
+    },
+    "calendar.error.disconnect" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The saved Google authorization could not be removed." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法移除已保存的 Google 授权。" } }
+      }
+    },
+    "calendar.error.notConfigured" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This build has no Google OAuth Client ID." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此构建尚未配置 Google OAuth Client ID。" } }
+      }
+    },
+    "calendar.error.restore" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The saved Google Calendar connection could not be restored." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法恢复已保存的 Google 日历连接。" } }
+      }
+    },
+    "calendar.error.sync" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Calendar sync failed." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "日历同步失败。" } }
+      }
+    },
+    "calendar.joinMeet" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Join Meet" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "加入 Meet" } }
+      }
+    },
+    "calendar.notConfigured" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Google Calendar is ready after this build receives LockTune's OAuth Client ID." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "配置 LockTune 的 OAuth Client ID 后即可连接 Google 日历。" } }
+      }
+    },
+    "calendar.noUpcomingEvents" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No events are scheduled in the selected calendars for the next 14 days." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "所选日历在未来 14 天内没有日程。" } }
+      }
+    },
+    "calendar.offlineCache" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Showing the last offline cache" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在显示最近的离线缓存" } }
+      }
+    },
+    "calendar.openInGoogle" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open in Google Calendar" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在 Google 日历中打开" } }
+      }
+    },
+    "calendar.refresh" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Refresh Calendar" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "刷新日历" } }
+      }
+    },
+    "calendar.untitled" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Untitled event" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未命名日程" } }
+      }
+    },
+    "island.accessibility" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "LockTune island" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "LockTune 灵动岛" } }
+      }
+    },
+    "island.idle" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Local music and meetings at a glance" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "本地音乐与会议信息一目了然" } }
+      }
+    },
+    "island.meetingSoon" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Meeting starts soon" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "会议即将开始" } }
+      }
+    },
     "library.addFolder" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Add Music Folder" } },
@@ -235,10 +397,124 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "播放功能尚未实现" } }
       }
     },
+    "library.browse" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Browse library" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "浏览音乐库" } }
+      }
+    },
+    "library.browse.songs" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Songs" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "歌曲" } }
+      }
+    },
+    "library.browse.albums" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Albums" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "专辑" } }
+      }
+    },
+    "library.browse.artists" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Artists" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "艺术家" } }
+      }
+    },
+    "library.browse.folders" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Folders" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "文件夹" } }
+      }
+    },
+    "library.browse.favorites" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Favorites" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "收藏" } }
+      }
+    },
+    "library.favorite" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Add to favorites" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "添加到收藏" } }
+      }
+    },
+    "library.unfavorite" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Remove from favorites" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "取消收藏" } }
+      }
+    },
+    "library.folder" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Folder" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "文件夹" } }
+      }
+    },
+    "library.search" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Search title, artist, album, or folder" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "搜索标题、艺术家、专辑或文件夹" } }
+      }
+    },
+    "player.shuffle" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Shuffle" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "随机播放" } }
+      }
+    },
+    "player.repeat.off" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Repeat off" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "关闭循环" } }
+      }
+    },
+    "player.repeat.all" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Repeat all" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "列表循环" } }
+      }
+    },
+    "player.repeat.one" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Repeat one" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "单曲循环" } }
+      }
+    },
     "settings.general" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "General" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "通用" } }
+      }
+    },
+    "settings.islandEnabled" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show LockTune island" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "显示 LockTune 灵动岛" } }
+      }
+    },
+    "settings.islandDescription" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Shows playback and imminent meetings at the top of the active display." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在当前显示器顶部展示播放状态和即将开始的会议。" } }
+      }
+    },
+    "settings.privacy" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Privacy" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "隐私" } }
+      }
+    },
+    "settings.lockScreenPrivacy" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The island hides when the macOS session locks; calendar details are never sent to the lock screen." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "macOS 会话锁定时灵动岛会隐藏；日历详情不会发送到锁屏。" } }
+      }
+    },
+    "settings.localOnly" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Music remains local and read-only. OAuth tokens are stored in Keychain." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "音乐始终保留在本地且只读；OAuth 令牌存储在钥匙串中。" } }
       }
     },
     "settings.preview" : {

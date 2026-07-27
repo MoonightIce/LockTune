@@ -4,10 +4,11 @@ LockTune is an open-source, local-first macOS companion that combines a local
 music player with a notch-style information surface for music and upcoming
 Google Calendar meetings.
 
-The repository is in active MVP development. The app shell, local music index,
-continuous playback queue, APE decoding, and system Now Playing integration are
-implemented. Google OAuth, Calendar/Meet, and the island window remain tracked
-work.
+The repository is in active MVP development. Local music indexing and playback,
+APE decoding, search, favorites, persistent queue modes, system Now Playing,
+Google Calendar/Meet, and the island window are implemented. A real Google
+account flow still requires LockTune's release Desktop OAuth Client ID to be
+configured in the build.
 
 ## Product boundaries
 
@@ -46,6 +47,9 @@ Build the application without distribution signing:
     xcodebuild -project LockTune.xcodeproj -scheme LockTune \
       -configuration Debug -destination 'platform=macOS' \
       CODE_SIGNING_ALLOWED=NO build
+
+Google Calendar setup for release and contributor builds is documented in
+`docs/google-oauth.md`.
 
 The first preview releases will be ad-hoc signed and not notarized. Stable
 signed releases are deferred until the project has a paid Apple Developer

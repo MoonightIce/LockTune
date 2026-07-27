@@ -151,6 +151,89 @@ func publishesPlaybackUpdates() async {
     #expect(observedPlaying)
 }
 
+@Test("Repeat all wraps the end of the queue")
+func repeatAllWrapsQueue() async {
+    let engine = RecordingAudioEngine()
+    let first = makePlaybackItem(id: "first")
+    let second = makePlaybackItem(id: "second")
+    let controller = PlaybackController(engine: engine)
+    await controller.setRepeatMode(.all)
+    await controller.replaceQueue([first, second], startingAt: 1)
+
+    await controller.next()
+
+    #expect(await controller.snapshot().currentItem == first)
+}
+
+@Test("Repeat one reloads the current item after it ends")
+func repeatOneReloadsCurrentItem() async {
+    let engine = RecordingAudioEngine()
+    let item = makePlaybackItem(id: "repeat")
+    let controller = PlaybackController(engine: engine)
+    await controller.setRepeatMode(.one)
+    await controller.replaceQueue([item], startingAt: 0)
+
+    await engine.emit(.ended)
+
+    #expect(await eventually { await engine.playCount == 2 })
+    #expect(await controller.snapshot().currentItem == item)
+}
+
+@Test("Shuffle advances to a different item")
+func shuffleAvoidsCurrentItem() async {
+    let engine = RecordingAudioEngine()
+    let first = makePlaybackItem(id: "first")
+    let second = makePlaybackItem(id: "second")
+    let controller = PlaybackController(engine: engine)
+    await controller.setOrder(.shuffled)
+    await controller.replaceQueue([first, second], startingAt: 0)
+
+    await controller.next()
+
+    #expect(await controller.snapshot().currentItem == second)
+}
+
+@Test("Shuffle without repeat visits every item once and then stops")
+func shuffleStopsAfterOnePass() async {
+    let engine = RecordingAudioEngine()
+    let items = [
+        makePlaybackItem(id: "first"),
+        makePlaybackItem(id: "second"),
+        makePlaybackItem(id: "third"),
+    ]
+    let controller = PlaybackController(engine: engine)
+    await controller.setOrder(.shuffled)
+    await controller.replaceQueue(items, startingAt: 0)
+
+    await controller.next()
+    await controller.next()
+    await controller.next()
+
+    #expect(Set(await engine.loadedURLs) == Set(items.map(\.url)))
+    #expect(await controller.snapshot().phase == .idle)
+}
+
+@Test("A restored queue stays stopped until the user presses play")
+func restoresQueueWithoutAutoplay() async {
+    let engine = RecordingAudioEngine()
+    let item = makePlaybackItem(id: "restored")
+    let controller = PlaybackController(engine: engine)
+    await controller.restore(PersistedPlaybackState(
+        queue: [item],
+        currentIndex: 0,
+        volume: 0.4,
+        order: .sequential,
+        repeatMode: .off
+    ))
+
+    #expect(await controller.snapshot().phase == .idle)
+    #expect(await engine.playCount == 0)
+
+    await controller.togglePlayPause()
+    #expect(await controller.snapshot().phase == .playing)
+    #expect(await engine.playCount == 1)
+}
+
 private func eventually(_ predicate: @escaping @Sendable () async -> Bool) async -> Bool {
     for _ in 0..<100 {
         if await predicate() { return true }

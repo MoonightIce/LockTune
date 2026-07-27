@@ -16,6 +16,7 @@
         A10000000000000000000007 /* LockTuneCore in Frameworks */ = {isa = PBXBuildFile; productRef = AC0000000000000000000001 /* LockTuneCore */; };
         A10000000000000000000008 /* LockTuneInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = AC0000000000000000000002 /* LockTuneInfrastructure */; };
         A10000000000000000000009 /* LockTuneDomain in Frameworks */ = {isa = PBXBuildFile; productRef = AC0000000000000000000003 /* LockTuneDomain */; };
+        A10000000000000000000010 /* IslandWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* IslandWindowController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +29,7 @@
         A20000000000000000000007 /* LockTune.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LockTune.entitlements; sourceTree = "<group>"; };
         A20000000000000000000008 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
         A20000000000000000000009 /* LockTune.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LockTune.app; sourceTree = BUILT_PRODUCTS_DIR; };
+        A20000000000000000000010 /* IslandWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandWindowController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -60,6 +62,7 @@
                 A20000000000000000000003 /* ContentView.swift */,
                 A20000000000000000000004 /* MenuBarView.swift */,
                 A20000000000000000000005 /* SettingsView.swift */,
+                A20000000000000000000010 /* IslandWindowController.swift */,
                 A20000000000000000000008 /* Localizable.xcstrings */,
                 A20000000000000000000006 /* Info.plist */,
                 A20000000000000000000007 /* LockTune.entitlements */,
@@ -159,6 +162,7 @@
                 A10000000000000000000003 /* ContentView.swift in Sources */,
                 A10000000000000000000004 /* MenuBarView.swift in Sources */,
                 A10000000000000000000005 /* SettingsView.swift in Sources */,
+                A10000000000000000000010 /* IslandWindowController.swift in Sources */,
             );
             runOnlyForDeploymentPostprocessing = 0;
         };
@@ -201,6 +205,7 @@
                     "$(inherited)",
                     "@executable_path/../Frameworks",
                 );
+                LOCKTUNE_GOOGLE_CLIENT_ID = "";
                 MARKETING_VERSION = 0.1.0;
                 ONLY_ACTIVE_ARCH = YES;
                 PRODUCT_BUNDLE_IDENTIFIER = app.locktune.macos;
@@ -225,6 +230,7 @@
                     "$(inherited)",
                     "@executable_path/../Frameworks",
                 );
+                LOCKTUNE_GOOGLE_CLIENT_ID = "";
                 MARKETING_VERSION = 0.1.0;
                 ONLY_ACTIVE_ARCH = NO;
                 PRODUCT_BUNDLE_IDENTIFIER = app.locktune.macos;

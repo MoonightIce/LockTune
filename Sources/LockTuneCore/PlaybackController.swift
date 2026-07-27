@@ -30,6 +30,7 @@ public actor PlaybackController {
     private let engine: any AudioEngine
     private var state = PlaybackSnapshot()
     private var eventTask: Task<Void, Never>?
+    private var shuffleRemaining: [Int] = []
     private let updateStream: AsyncStream<PlaybackSnapshot>
     private let updateContinuation: AsyncStream<PlaybackSnapshot>.Continuation
 
@@ -53,13 +54,19 @@ public actor PlaybackController {
         observeEngineEventsIfNeeded()
         guard items.indices.contains(index) else {
             await engine.stop()
-            state = PlaybackSnapshot(queue: items, volume: state.volume)
+            state = PlaybackSnapshot(
+                queue: items,
+                volume: state.volume,
+                order: state.order,
+                repeatMode: state.repeatMode
+            )
             publishState()
             return
         }
 
         state.queue = items
         state.currentIndex = index
+        resetShuffleRemaining(excluding: index)
         state.phase = .loading
         state.elapsed = 0
         state.duration = items[index].duration
@@ -92,7 +99,11 @@ public actor PlaybackController {
                 state.phase = .failed
                 state.failureReason = .audioOutputUnavailable
             }
-        case .idle, .loading, .failed:
+        case .idle:
+            if let currentIndex = state.currentIndex {
+                await loadAndPlay(index: currentIndex)
+            }
+        case .loading, .failed:
             break
         }
         publishState()
@@ -100,15 +111,27 @@ public actor PlaybackController {
 
     public func next() async {
         guard let currentIndex = state.currentIndex else { return }
-        let nextIndex = currentIndex + 1
-        guard state.queue.indices.contains(nextIndex) else {
-            await engine.stop()
-            state.phase = .idle
-            state.elapsed = state.duration ?? state.elapsed
-            publishState()
+        if state.order == .shuffled {
+            if shuffleRemaining.isEmpty, state.repeatMode == .all {
+                resetShuffleRemaining(excluding: currentIndex)
+            }
+            guard !shuffleRemaining.isEmpty else {
+                await stopAtQueueEnd()
+                return
+            }
+            let position = Int.random(in: shuffleRemaining.indices)
+            let nextIndex = shuffleRemaining.remove(at: position)
+            await loadAndPlay(index: nextIndex)
             return
         }
-        await loadAndPlay(index: nextIndex)
+        let candidate = currentIndex + 1
+        if state.queue.indices.contains(candidate) {
+            await loadAndPlay(index: candidate)
+        } else if state.repeatMode == .all, !state.queue.isEmpty {
+            await loadAndPlay(index: 0)
+        } else {
+            await stopAtQueueEnd()
+        }
     }
 
     public func previous() async {
@@ -142,6 +165,35 @@ public actor PlaybackController {
         let clamped = min(max(volume, 0), 1)
         state.volume = clamped
         await engine.setVolume(clamped)
+        publishState()
+    }
+
+    public func setOrder(_ order: PlaybackOrder) {
+        state.order = order
+        resetShuffleRemaining(excluding: state.currentIndex)
+        publishState()
+    }
+
+    public func setRepeatMode(_ repeatMode: PlaybackRepeatMode) {
+        state.repeatMode = repeatMode
+        publishState()
+    }
+
+    public func restore(_ persisted: PersistedPlaybackState) async {
+        await engine.stop()
+        let currentIndex = persisted.currentIndex.flatMap { persisted.queue.indices.contains($0) ? $0 : nil }
+        state = PlaybackSnapshot(
+            queue: persisted.queue,
+            currentIndex: currentIndex,
+            phase: .idle,
+            elapsed: 0,
+            duration: currentIndex.map { persisted.queue[$0].duration } ?? nil,
+            volume: min(max(persisted.volume, 0), 1),
+            order: persisted.order,
+            repeatMode: persisted.repeatMode
+        )
+        await engine.setVolume(state.volume)
+        resetShuffleRemaining(excluding: currentIndex)
         publishState()
     }
 
@@ -180,6 +232,17 @@ public actor PlaybackController {
         publishState()
     }
 
+    private func resetShuffleRemaining(excluding currentIndex: Int?) {
+        shuffleRemaining = state.queue.indices.filter { $0 != currentIndex }
+    }
+
+    private func stopAtQueueEnd() async {
+        await engine.stop()
+        state.phase = .idle
+        state.elapsed = state.duration ?? state.elapsed
+        publishState()
+    }
+
     private func observeEngineEventsIfNeeded() {
         guard eventTask == nil else { return }
         let engine = self.engine
@@ -198,7 +261,11 @@ public actor PlaybackController {
             state.elapsed = max(0, elapsed)
             state.duration = duration ?? state.duration
         case .ended:
-            await next()
+            if state.repeatMode == .one, let currentIndex = state.currentIndex {
+                await loadAndPlay(index: currentIndex)
+            } else {
+                await next()
+            }
         case let .failed(reason):
             state.phase = .failed
             state.failureReason = reason
