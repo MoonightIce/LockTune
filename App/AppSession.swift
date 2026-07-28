@@ -358,6 +358,7 @@ final class AppSession {
                     url: location.url,
                     title: track.metadata.title ?? String(localized: "library.unknownTitle"),
                     artist: track.metadata.artist,
+                    album: track.metadata.album,
                     duration: track.metadata.duration
                 )
             }

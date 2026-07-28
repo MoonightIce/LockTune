@@ -13,7 +13,9 @@ func playbackStateRoundTrip() async throws {
         trackID: UUID(),
         locationID: "location",
         url: URL(fileURLWithPath: "/Music/Test.flac"),
-        title: "Test"
+        title: "Test",
+        artist: "Artist",
+        album: "Album"
     )
     let snapshot = PlaybackSnapshot(
         queue: [item],

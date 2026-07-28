@@ -274,6 +274,21 @@ public actor PlaybackController {
     }
 
     private func publishState() {
+        state.canAdvance = calculateCanAdvance()
         updateContinuation.yield(state)
+    }
+
+    private func calculateCanAdvance() -> Bool {
+        guard let currentIndex = state.currentIndex else { return false }
+        if state.order == .shuffled {
+            if state.repeatMode == .all {
+                return state.queue.count > 1
+            }
+            return !shuffleRemaining.isEmpty
+        }
+        if state.queue.indices.contains(currentIndex + 1) {
+            return true
+        }
+        return state.repeatMode == .all && !state.queue.isEmpty
     }
 }

@@ -11,6 +11,23 @@ public enum SystemPlaybackCommand: Sendable {
     case seek(TimeInterval)
 }
 
+func makeSystemNowPlayingInfo(from snapshot: PlaybackSnapshot) -> [String: Any]? {
+    guard snapshot.phase != .failed, let item = snapshot.currentItem else { return nil }
+
+    var info: [String: Any] = [
+        MPMediaItemPropertyTitle: item.title,
+        MPNowPlayingInfoPropertyElapsedPlaybackTime: snapshot.elapsed,
+        MPNowPlayingInfoPropertyPlaybackRate: snapshot.phase == .playing ? 1.0 : 0.0,
+        MPNowPlayingInfoPropertyDefaultPlaybackRate: 1.0,
+        MPNowPlayingInfoPropertyExternalContentIdentifier: item.locationID,
+        MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.audio.rawValue,
+    ]
+    if let artist = item.artist { info[MPMediaItemPropertyArtist] = artist }
+    if let album = item.album { info[MPMediaItemPropertyAlbumTitle] = album }
+    if let duration = snapshot.duration { info[MPMediaItemPropertyPlaybackDuration] = duration }
+    return info
+}
+
 @MainActor
 public final class SystemNowPlayingCenter {
     private let commandCenter: MPRemoteCommandCenter
@@ -35,23 +52,13 @@ public final class SystemNowPlayingCenter {
     }
 
     public func update(_ snapshot: PlaybackSnapshot, artworkData: Data?) {
-        guard let item = snapshot.currentItem else {
+        guard var info = makeSystemNowPlayingInfo(from: snapshot) else {
             infoCenter.nowPlayingInfo = nil
             infoCenter.playbackState = .stopped
             updateCommandAvailability(hasItem: false, snapshot: snapshot)
             return
         }
 
-        var info: [String: Any] = [
-            MPMediaItemPropertyTitle: item.title,
-            MPNowPlayingInfoPropertyElapsedPlaybackTime: snapshot.elapsed,
-            MPNowPlayingInfoPropertyPlaybackRate: snapshot.phase == .playing ? 1.0 : 0.0,
-            MPNowPlayingInfoPropertyDefaultPlaybackRate: 1.0,
-            MPNowPlayingInfoPropertyExternalContentIdentifier: item.locationID,
-            MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.audio.rawValue,
-        ]
-        if let artist = item.artist { info[MPMediaItemPropertyArtist] = artist }
-        if let duration = snapshot.duration { info[MPMediaItemPropertyPlaybackDuration] = duration }
         if let artworkData, let image = NSImage(data: artworkData) {
             info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
         }
@@ -93,10 +100,10 @@ public final class SystemNowPlayingCenter {
     }
 
     private func updateCommandAvailability(hasItem: Bool, snapshot: PlaybackSnapshot) {
-        commandCenter.playCommand.isEnabled = hasItem && snapshot.phase != .playing
+        commandCenter.playCommand.isEnabled = hasItem
+            && (snapshot.phase == .paused || snapshot.phase == .idle)
         commandCenter.pauseCommand.isEnabled = hasItem && snapshot.phase == .playing
-        commandCenter.nextTrackCommand.isEnabled = hasItem
-            && snapshot.currentIndex.map { $0 + 1 < snapshot.queue.count } == true
+        commandCenter.nextTrackCommand.isEnabled = hasItem && snapshot.canAdvance == true
         commandCenter.previousTrackCommand.isEnabled = hasItem
         commandCenter.changePlaybackPositionCommand.isEnabled = hasItem && snapshot.duration != nil
     }

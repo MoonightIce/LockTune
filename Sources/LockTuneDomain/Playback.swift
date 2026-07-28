@@ -6,6 +6,7 @@ public struct PlaybackItem: Identifiable, Equatable, Codable, Sendable {
     public let url: URL
     public let title: String
     public let artist: String?
+    public let album: String?
     public let duration: TimeInterval?
 
     public var id: String { locationID }
@@ -16,6 +17,7 @@ public struct PlaybackItem: Identifiable, Equatable, Codable, Sendable {
         url: URL,
         title: String,
         artist: String? = nil,
+        album: String? = nil,
         duration: TimeInterval? = nil
     ) {
         self.trackID = trackID
@@ -23,6 +25,7 @@ public struct PlaybackItem: Identifiable, Equatable, Codable, Sendable {
         self.url = url
         self.title = title
         self.artist = artist
+        self.album = album
         self.duration = duration
     }
 }
@@ -62,6 +65,7 @@ public struct PlaybackSnapshot: Equatable, Codable, Sendable {
     public var failureReason: PlaybackFailureReason?
     public var order: PlaybackOrder
     public var repeatMode: PlaybackRepeatMode
+    public var canAdvance: Bool?
 
     public var currentItem: PlaybackItem? {
         guard let currentIndex, queue.indices.contains(currentIndex) else { return nil }
@@ -77,7 +81,8 @@ public struct PlaybackSnapshot: Equatable, Codable, Sendable {
         volume: Float = 1,
         failureReason: PlaybackFailureReason? = nil,
         order: PlaybackOrder = .sequential,
-        repeatMode: PlaybackRepeatMode = .off
+        repeatMode: PlaybackRepeatMode = .off,
+        canAdvance: Bool? = nil
     ) {
         self.queue = queue
         self.currentIndex = currentIndex
@@ -88,6 +93,7 @@ public struct PlaybackSnapshot: Equatable, Codable, Sendable {
         self.failureReason = failureReason
         self.order = order
         self.repeatMode = repeatMode
+        self.canAdvance = canAdvance
     }
 }
 

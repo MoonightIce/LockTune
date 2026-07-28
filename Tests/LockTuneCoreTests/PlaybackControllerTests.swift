@@ -58,6 +58,7 @@ func movesThroughQueue() async {
     let controller = PlaybackController(engine: engine)
     await controller.replaceQueue([first, second], startingAt: 0)
 
+    #expect(await controller.snapshot().canAdvance == true)
     await controller.next()
     #expect(await controller.snapshot().currentItem == second)
 
@@ -160,6 +161,7 @@ func repeatAllWrapsQueue() async {
     await controller.setRepeatMode(.all)
     await controller.replaceQueue([first, second], startingAt: 1)
 
+    #expect(await controller.snapshot().canAdvance == true)
     await controller.next()
 
     #expect(await controller.snapshot().currentItem == first)
@@ -188,6 +190,7 @@ func shuffleAvoidsCurrentItem() async {
     await controller.setOrder(.shuffled)
     await controller.replaceQueue([first, second], startingAt: 0)
 
+    #expect(await controller.snapshot().canAdvance == true)
     await controller.next()
 
     #expect(await controller.snapshot().currentItem == second)
@@ -210,7 +213,9 @@ func shuffleStopsAfterOnePass() async {
     await controller.next()
 
     #expect(Set(await engine.loadedURLs) == Set(items.map(\.url)))
-    #expect(await controller.snapshot().phase == .idle)
+    let snapshot = await controller.snapshot()
+    #expect(snapshot.phase == .idle)
+    #expect(snapshot.canAdvance == false)
 }
 
 @Test("A restored queue stays stopped until the user presses play")
