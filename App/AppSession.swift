@@ -24,6 +24,8 @@ final class AppSession {
     var calendarConnectionState: CalendarConnectionState = .disconnected
     var calendarError: String?
     var isScanningMusic = false
+    var musicScanProgress: MusicScanProgress?
+    var currentArtworkData: Data?
     var isIslandEnabled: Bool
     var lastMusicScan: Date? { musicLibrary.scanState.lastCompletedAt }
     var musicLibraryError: String?
@@ -48,6 +50,8 @@ final class AppSession {
     private var calendarRefreshTask: Task<Void, Never>?
     private var activeOAuthServer: LoopbackOAuthServer?
     private var lastPersistedPlaybackState: PersistedPlaybackState?
+    private var musicScanTask: Task<Void, Never>?
+    private var currentArtworkTrackID: UUID?
 
     init() {
         let islandPreference = UserDefaults.standard.object(forKey: "island.enabled") as? Bool
@@ -214,13 +218,9 @@ final class AppSession {
                 return
             }
             musicLibrary = try await indexStore.load()
-            for index in musicLibrary.tracks.indices {
-                guard let key = musicLibrary.tracks[index].metadata.artworkCacheKey else { continue }
-                musicLibrary.tracks[index].metadata.artworkData = try? await artworkCache.data(for: key)
-                if musicLibrary.tracks[index].metadata.artworkData == nil,
-                   musicLibrary.tracks[index].metadata.status == .complete {
-                    musicLibrary.tracks[index].metadata.status = .partial
-                }
+            if resolution.urls.isEmpty, resolution.failedBookmarkCount == 0 {
+                musicLibrary = MusicLibrarySnapshot()
+                try await indexStore.save(musicLibrary)
             }
             if resolution.failedBookmarkCount > 0 {
                 musicLibraryError = String(localized: "library.error.someFoldersUnavailable")
@@ -253,25 +253,78 @@ final class AppSession {
         panel.prompt = String(localized: "library.addFolder")
         guard panel.runModal() == .OK else { return }
         do {
-            for url in panel.urls { try folderStore.add(url) }
+            let selectedFolders = panel.urls.map(\.standardizedFileURL)
+            let existingFolders = Set(folderStore.resolveAll().urls.map(\.standardizedFileURL))
+            let newlyAuthorizedFolders = selectedFolders.filter {
+                !existingFolders.contains($0.standardizedFileURL)
+            }
+            for url in selectedFolders { try folderStore.add(url) }
             let resolution = folderStore.resolveAll()
             musicFolders = resolution.urls
             refreshMusicFolderAccess(resolution.urls)
-            await scanMusicFolders()
+            guard !newlyAuthorizedFolders.isEmpty else { return }
+            await scanMusicFolders(folderURLs: newlyAuthorizedFolders)
         } catch {
             musicLibraryError = String(localized: "library.error.authorization")
         }
     }
 
     func scanMusicFolders() async {
+        await scanMusicFolders(folderURLs: nil)
+    }
+
+    func cancelMusicScan() {
+        musicScanTask?.cancel()
+    }
+
+    func removeMusicFolder(_ folder: URL) async {
+        cancelMusicScan()
+        await musicScanTask?.value
+        folderStore.remove(folder)
+        await applyFolderRemoval()
+    }
+
+    func clearMusicFolders() async {
+        cancelMusicScan()
+        await musicScanTask?.value
+        folderStore.removeAll()
+        await applyFolderRemoval()
+    }
+
+    func loadArtworkData(for trackID: UUID?) async -> Data? {
+        guard let trackID,
+              let track = musicLibrary.tracks.first(where: { $0.id == trackID })
+        else { return nil }
+        if let data = track.metadata.artworkData, !data.isEmpty {
+            return data
+        }
+        guard let key = track.metadata.artworkCacheKey else { return nil }
+        return try? await artworkCache.data(for: key)
+    }
+
+    private func scanMusicFolders(folderURLs: [URL]?) async {
         guard !isScanningMusic else { return }
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            await performMusicScan(folderURLs: folderURLs)
+        }
+        musicScanTask = task
+        await task.value
+        musicScanTask = nil
+    }
+
+    private func performMusicScan(folderURLs requestedFolders: [URL]?) async {
         guard let indexStore else {
             musicLibraryError = String(localized: "library.error.indexUnavailable")
             return
         }
         isScanningMusic = true
+        musicScanProgress = MusicScanProgress(phase: .discovering, completed: 0, total: 0)
         musicLibraryError = nil
-        defer { isScanningMusic = false }
+        defer {
+            isScanningMusic = false
+            musicScanProgress = nil
+        }
         do {
             let resolution = folderStore.resolveAll()
             let folders = resolution.urls
@@ -280,24 +333,97 @@ final class AppSession {
                 refreshMusicFolderAccess(folders)
             }
             let accessibleFolders = musicFoldersWithActiveAccess
-            guard !folders.isEmpty, !accessibleFolders.isEmpty else {
+            let scanFolders: [URL]
+            if let requestedFolders {
+                let requested = Set(requestedFolders.map(\.standardizedFileURL))
+                scanFolders = accessibleFolders.filter { requested.contains($0.standardizedFileURL) }
+            } else {
+                scanFolders = accessibleFolders
+            }
+            guard !folders.isEmpty, !scanFolders.isEmpty else {
                 musicLibraryError = String(localized: "library.error.authorization")
                 return
             }
             var snapshot = await MusicLibraryScanner(metadataReader: SystemAudioMetadataReader())
-                .scan(folderURLs: accessibleFolders, previous: musicLibrary)
+                .scan(folderURLs: scanFolders, previous: musicLibrary) { [weak self] progress in
+                    await MainActor.run {
+                        self?.musicScanProgress = progress
+                    }
+                }
+            guard !Task.isCancelled else { return }
+            musicScanProgress = MusicScanProgress(
+                phase: .artwork,
+                completed: 0,
+                total: snapshot.tracks.count
+            )
+            var lastArtworkProgress = ContinuousClock.now
             for index in snapshot.tracks.indices {
+                guard !Task.isCancelled else { return }
                 snapshot.tracks[index] = try await artworkCache.persistArtwork(in: snapshot.tracks[index])
+                let now = ContinuousClock.now
+                if index + 1 == snapshot.tracks.count
+                    || lastArtworkProgress.duration(to: now) >= .milliseconds(120) {
+                    musicScanProgress = MusicScanProgress(
+                        phase: .artwork,
+                        completed: index + 1,
+                        total: snapshot.tracks.count
+                    )
+                    lastArtworkProgress = now
+                }
             }
+            guard !Task.isCancelled else { return }
             snapshot.scanState.lastCompletedAt = Date()
+            musicScanProgress = MusicScanProgress(phase: .saving, completed: 0, total: 1)
             try await indexStore.save(snapshot)
+            musicScanProgress = MusicScanProgress(phase: .saving, completed: 1, total: 1)
             musicLibrary = snapshot
+            await refreshCurrentArtwork()
             if resolution.failedBookmarkCount > 0 || accessibleFolders.count != folders.count {
                 musicLibraryError = String(localized: "library.error.someFoldersUnavailable")
             }
         } catch {
             musicLibraryError = String(localized: "library.error.scan")
         }
+    }
+
+    private func applyFolderRemoval() async {
+        let resolution = folderStore.resolveAll()
+        musicFolders = resolution.urls
+        refreshMusicFolderAccess(resolution.urls)
+        let snapshot = musicLibrary.retainingAuthorizedRoots(resolution.urls)
+        do {
+            try await indexStore?.save(snapshot)
+            musicLibrary = snapshot
+            await prunePlaybackForAvailableLocations()
+            await refreshCurrentArtwork()
+            musicLibraryError = resolution.failedBookmarkCount > 0
+                ? String(localized: "library.error.someFoldersUnavailable")
+                : nil
+        } catch {
+            musicLibraryError = String(localized: "library.error.scan")
+        }
+    }
+
+    private func prunePlaybackForAvailableLocations() async {
+        let availableLocations = Set(musicLibrary.locations.map(\.id))
+        let currentLocationID = playback.currentItem?.locationID
+        let queue = playback.queue.filter { availableLocations.contains($0.locationID) }
+        let currentIndex = currentLocationID.flatMap { id in
+            queue.firstIndex(where: { $0.locationID == id })
+        }
+        await playbackController.restore(PersistedPlaybackState(
+            queue: queue,
+            currentIndex: currentIndex,
+            volume: playback.volume,
+            order: playback.order,
+            repeatMode: playback.repeatMode
+        ))
+    }
+
+    private func refreshCurrentArtwork() async {
+        currentArtworkTrackID = playback.currentItem?.trackID
+        currentArtworkData = await loadArtworkData(for: currentArtworkTrackID)
+        nowPlayingCenter.update(playback, artworkData: currentArtworkData)
     }
 
     func play(trackID: UUID) async {
@@ -340,8 +466,8 @@ final class AppSession {
     }
 
     func artworkData(for trackID: UUID?) -> Data? {
-        guard let trackID else { return nil }
-        return musicLibrary.tracks.first(where: { $0.id == trackID })?.metadata.artworkData
+        guard let trackID, currentArtworkTrackID == trackID else { return nil }
+        return currentArtworkData
     }
 
     private var playbackItems: [PlaybackItem] {
@@ -381,7 +507,11 @@ final class AppSession {
                 guard !Task.isCancelled else { return }
                 guard let self else { return }
                 playback = snapshot
-                nowPlayingCenter.update(snapshot, artworkData: artworkData(for: snapshot.currentItem?.trackID))
+                if currentArtworkTrackID != snapshot.currentItem?.trackID {
+                    currentArtworkTrackID = snapshot.currentItem?.trackID
+                    currentArtworkData = await loadArtworkData(for: currentArtworkTrackID)
+                }
+                nowPlayingCenter.update(snapshot, artworkData: currentArtworkData)
                 let persisted = PersistedPlaybackState(snapshot: snapshot)
                 if persisted != lastPersistedPlaybackState {
                     try? await playbackStateStore.save(persisted)

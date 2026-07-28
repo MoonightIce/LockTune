@@ -313,6 +313,48 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "刷新音乐库" } }
       }
     },
+    "library.scan.artwork" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Preparing album artwork" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在准备专辑封面" } }
+      }
+    },
+    "library.scan.cancel" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Cancel Scan" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "取消扫描" } }
+      }
+    },
+    "library.scan.discovering" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Finding supported audio files" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在查找支持的音乐文件" } }
+      }
+    },
+    "library.scan.indexing" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reading metadata and building the index" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在读取元数据并建立索引" } }
+      }
+    },
+    "library.scan.readOnly" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Source files remain unchanged." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "源文件不会被修改。" } }
+      }
+    },
+    "library.scan.saving" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Saving the local index" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在保存本地索引" } }
+      }
+    },
+    "library.scan.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Updating Music Library" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在更新音乐库" } }
+      }
+    },
     "library.title" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Title" } },
@@ -539,6 +581,54 @@
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Disconnect Google Calendar?" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "断开 Google 日历？" } }
+      }
+    },
+    "settings.musicFolderRemove" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Remove" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "移除" } }
+      }
+    },
+    "settings.musicFolderRemoveConfirmation" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Remove this authorized folder?" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "移除这个授权目录？" } }
+      }
+    },
+    "settings.musicFolderRemoveMessage" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "LockTune will remove its bookmark and the corresponding rebuildable index entries. Source files remain unchanged." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "LockTune 将移除目录书签及对应的可重建索引；源文件不会被修改。" } }
+      }
+    },
+    "settings.musicFolders" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Authorized Music Folders" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已授权音乐目录" } }
+      }
+    },
+    "settings.musicFoldersClear" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Clear All" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "全部清除" } }
+      }
+    },
+    "settings.musicFoldersClearConfirmation" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Clear all authorized folders?" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "清除所有授权目录？" } }
+      }
+    },
+    "settings.musicFoldersClearMessage" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "LockTune will stop scanning, remove every folder bookmark, and clear the rebuildable music index. Source files remain unchanged." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "LockTune 将停止扫描、移除全部目录书签并清空可重建音乐索引；源文件不会被修改。" } }
+      }
+    },
+    "settings.musicFoldersEmpty" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No music folders are currently authorized." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "当前没有已授权音乐目录。" } }
       }
     },
     "settings.general" : {

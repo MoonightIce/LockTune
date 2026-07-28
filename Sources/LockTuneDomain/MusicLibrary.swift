@@ -97,6 +97,30 @@ public struct MusicScanState: Equatable, Codable, Sendable {
     }
 }
 
+public enum MusicScanPhase: String, Equatable, Sendable {
+    case discovering
+    case indexing
+    case artwork
+    case saving
+}
+
+public struct MusicScanProgress: Equatable, Sendable {
+    public let phase: MusicScanPhase
+    public let completed: Int
+    public let total: Int
+
+    public init(phase: MusicScanPhase, completed: Int, total: Int) {
+        self.phase = phase
+        self.completed = completed
+        self.total = total
+    }
+
+    public var fractionCompleted: Double? {
+        guard total > 0 else { return nil }
+        return min(max(Double(completed) / Double(total), 0), 1)
+    }
+}
+
 public struct MusicLibrarySnapshot: Equatable, Codable, Sendable {
     public var tracks: [Track]
     public var locations: [TrackLocation]

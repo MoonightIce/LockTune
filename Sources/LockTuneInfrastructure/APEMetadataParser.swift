@@ -1,15 +1,28 @@
 import Foundation
 import LockTuneDomain
 
+protocol APEByteReading: AnyObject {
+    var size: Int { get }
+    func read(offset: Int, count: Int) throws -> Data
+}
+
 enum APEMetadataParser {
     static func parse(url: URL) -> TrackMetadata {
-        guard let data = try? Data(contentsOf: url, options: .mappedIfSafe),
-              data.count >= 76,
-              data.prefix(4) == Data("MAC ".utf8)
+        guard let reader = try? APEFileReader(url: url) else {
+            return TrackMetadata(status: .unavailable)
+        }
+        return parse(reader: reader)
+    }
+
+    static func parse(reader: any APEByteReading) -> TrackMetadata {
+        let headerCount = min(reader.size, 512)
+        guard let header = try? reader.read(offset: 0, count: headerCount),
+              header.count >= 76,
+              header.prefix(4) == Data("MAC ".utf8)
         else { return TrackMetadata(status: .unavailable) }
 
-        let duration = durationSeconds(data: data)
-        let tags = tags(data: data)
+        let duration = durationSeconds(data: header)
+        let tags = readTags(from: reader)
         let title = tags["title"].flatMap(text)
         let artist = tags["artist"].flatMap(text)
         let album = tags["album"].flatMap(text)
@@ -37,6 +50,22 @@ enum APEMetadataParser {
                 artwork: artwork
             )
         )
+    }
+
+    private static func readTags(from reader: any APEByteReading) -> [String: Data] {
+        let probeCount = min(reader.size, 512)
+        let probeOffset = reader.size - probeCount
+        guard let footerProbe = try? reader.read(offset: probeOffset, count: probeCount),
+              let markerRange = footerProbe.range(of: Data("APETAGEX".utf8), options: .backwards),
+              let tagSize = footerProbe.u32(at: markerRange.lowerBound + 12)
+        else { return [:] }
+        let markerOffset = probeOffset + markerRange.lowerBound
+        let tagStart = markerOffset + 32 - Int(tagSize)
+        guard tagStart >= 0,
+              Int(tagSize) <= reader.size - tagStart,
+              let tagData = try? reader.read(offset: tagStart, count: Int(tagSize))
+        else { return [:] }
+        return tags(data: tagData)
     }
 
     private static func durationSeconds(data: Data) -> TimeInterval? {
@@ -105,6 +134,26 @@ enum APEMetadataParser {
 
     private static func text(_ data: Data) -> String? {
         String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+private final class APEFileReader: APEByteReading {
+    let size: Int
+    private let handle: FileHandle
+
+    init(url: URL) throws {
+        handle = try FileHandle(forReadingFrom: url)
+        size = Int(try handle.seekToEnd())
+    }
+
+    deinit {
+        try? handle.close()
+    }
+
+    func read(offset: Int, count: Int) throws -> Data {
+        guard offset >= 0, count >= 0, offset <= size else { return Data() }
+        try handle.seek(toOffset: UInt64(offset))
+        return try handle.read(upToCount: min(count, size - offset)) ?? Data()
     }
 }
 

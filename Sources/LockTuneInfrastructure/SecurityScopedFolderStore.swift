@@ -104,6 +104,10 @@ public final class SecurityScopedFolderStore {
         defaults.set(retained, forKey: key)
     }
 
+    public func removeAll() {
+        defaults.removeObject(forKey: key)
+    }
+
     private var storedBookmarks: [Data] {
         defaults.array(forKey: key) as? [Data] ?? []
     }

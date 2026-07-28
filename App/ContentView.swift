@@ -46,14 +46,20 @@ private struct MusicLibraryView: View {
     var body: some View {
         Group {
             if session.musicLibrary.tracks.isEmpty {
-                ContentUnavailableView {
-                    Label("sidebar.library", systemImage: "music.note.list")
-                } description: {
-                    Text("placeholder.library")
-                } actions: {
-                    Button("library.addFolder", systemImage: "folder.badge.plus") {
-                        Task { await session.chooseMusicFolder() }
+                if session.musicScanProgress == nil {
+                    ContentUnavailableView {
+                        Label("sidebar.library", systemImage: "music.note.list")
+                    } description: {
+                        Text("placeholder.library")
+                    } actions: {
+                        Button("library.addFolder", systemImage: "folder.badge.plus") {
+                            Task { await session.chooseMusicFolder() }
+                        }
                     }
+                } else {
+                    Color.clear
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .accessibilityHidden(true)
                 }
             } else {
                 Table(sortedRows, selection: $selectedTrackID) {
@@ -111,7 +117,6 @@ private struct MusicLibraryView: View {
         .searchable(text: $searchText, prompt: "library.search")
         .toolbar {
             ToolbarItemGroup {
-                if session.isScanningMusic { ProgressView().controlSize(.small) }
                 Picker("library.browse", selection: $browseMode) {
                     ForEach(LibraryBrowseMode.allCases) { mode in
                         Label(mode.title, systemImage: mode.systemImage).tag(mode)
@@ -133,6 +138,17 @@ private struct MusicLibraryView: View {
                 .disabled(session.isScanningMusic)
             }
         }
+        .overlay(alignment: .topTrailing) {
+            if let progress = session.musicScanProgress {
+                MusicScanProgressCard(
+                    progress: progress,
+                    cancel: session.cancelMusicScan
+                )
+                    .padding(16)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: session.musicScanProgress != nil)
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 0) {
                 if !session.musicLibrary.issues.isEmpty {
@@ -224,19 +240,7 @@ private struct MusicLibraryView: View {
 
     @ViewBuilder
     private func artwork(_ track: Track) -> some View {
-        if let image = ArtworkThumbnailCache.shared.image(for: track) {
-            Image(nsImage: image)
-                .resizable()
-                .scaledToFill()
-                .frame(width: 34, height: 34)
-                .clipShape(RoundedRectangle(cornerRadius: 5))
-        } else {
-            Image(systemName: "questionmark")
-                .frame(width: 34, height: 34)
-                .background(.quaternary, in: RoundedRectangle(cornerRadius: 5))
-                .accessibilityLabel(Text("library.artworkUnknown"))
-                .help("library.artworkUnknown")
-        }
+        LibraryArtworkView(track: track, session: session)
     }
 
     private func issueLabel(_ reason: MusicScanIssueReason) -> String {
@@ -244,6 +248,70 @@ private struct MusicLibraryView: View {
         case .unreadable: String(localized: "library.issue.unreadable")
         case .metadataUnavailable: String(localized: "library.issue.metadataUnavailable")
         case .unsupportedFormat: String(localized: "library.issue.unsupportedFormat")
+        }
+    }
+}
+
+private struct MusicScanProgressCard: View {
+    let progress: MusicScanProgress
+    let cancel: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: phaseImage)
+                    .foregroundStyle(.tint)
+                Text("library.scan.title")
+                    .font(.headline)
+                Spacer()
+                if progress.total > 0 {
+                    Text("\(progress.completed)/\(progress.total)")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(minWidth: 72, alignment: .trailing)
+                }
+            }
+            Text(phaseLabel)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            if let fraction = progress.fractionCompleted {
+                ProgressView(value: fraction)
+                    .progressViewStyle(.linear)
+            } else {
+                ProgressView()
+                    .progressViewStyle(.linear)
+            }
+            Text("library.scan.readOnly")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+            Button("library.scan.cancel", role: .cancel, action: cancel)
+                .controlSize(.small)
+        }
+        .padding(14)
+        .frame(width: 300)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor).opacity(0.6))
+        }
+        .shadow(color: .black.opacity(0.12), radius: 16, y: 8)
+    }
+
+    private var phaseLabel: LocalizedStringKey {
+        switch progress.phase {
+        case .discovering: "library.scan.discovering"
+        case .indexing: "library.scan.indexing"
+        case .artwork: "library.scan.artwork"
+        case .saving: "library.scan.saving"
+        }
+    }
+
+    private var phaseImage: String {
+        switch progress.phase {
+        case .discovering: "folder.badge.gearshape"
+        case .indexing: "waveform.badge.magnifyingglass"
+        case .artwork: "photo.stack"
+        case .saving: "internaldrive"
         }
     }
 }
@@ -265,9 +333,9 @@ private final class ArtworkThumbnailCache {
         images.totalCostLimit = 16 * 1_024 * 1_024
     }
 
-    func image(for track: Track) -> NSImage? {
-        guard let data = track.metadata.artworkData, !data.isEmpty else { return nil }
-        let key = NSString(string: track.metadata.artworkCacheKey ?? track.contentFingerprint)
+    func image(data: Data, key: String) -> NSImage? {
+        guard !data.isEmpty else { return nil }
+        let key = NSString(string: key)
         if let cached = images.object(forKey: key) { return cached }
 
         let options: [CFString: Any] = [
@@ -283,6 +351,39 @@ private final class ArtworkThumbnailCache {
         let image = NSImage(cgImage: thumbnail, size: NSSize(width: 34, height: 34))
         images.setObject(image, forKey: key, cost: thumbnail.bytesPerRow * thumbnail.height)
         return image
+    }
+}
+
+private struct LibraryArtworkView: View {
+    let track: Track
+    @Bindable var session: AppSession
+    @State private var image: NSImage?
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Image(systemName: "questionmark")
+                    .accessibilityLabel(Text("library.artworkUnknown"))
+                    .help("library.artworkUnknown")
+            }
+        }
+        .frame(width: 34, height: 34)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 5))
+        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .task(id: track.metadata.artworkCacheKey) {
+            guard let data = await session.loadArtworkData(for: track.id) else {
+                image = nil
+                return
+            }
+            image = ArtworkThumbnailCache.shared.image(
+                data: data,
+                key: track.metadata.artworkCacheKey ?? track.contentFingerprint
+            )
+        }
     }
 }
 

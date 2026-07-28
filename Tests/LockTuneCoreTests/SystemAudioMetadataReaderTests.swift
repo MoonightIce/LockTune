@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 import LockTuneDomain
-import LockTuneInfrastructure
+@testable import LockTuneInfrastructure
 
 @Test("APE metadata reader parses APEv2 tags and modern duration")
 func readsAPEMetadata() async throws {
@@ -18,6 +18,19 @@ func readsAPEMetadata() async throws {
     #expect(metadata.duration == 10)
     #expect(metadata.artworkData == Data([1, 2, 3, 4]))
     #expect(metadata.status == .complete)
+}
+
+@Test("APE metadata reads only the header, footer probe, and tag region")
+func readsBoundedAPERegions() throws {
+    let reader = TrackingAPEByteReader(
+        data: makeAPEFixture(audioPayloadSize: 16 * 1_024 * 1_024)
+    )
+
+    let metadata = APEMetadataParser.parse(reader: reader)
+
+    #expect(metadata.title == "Fixture Title")
+    #expect(reader.totalRequestedBytes < 1_024 * 1_024)
+    #expect(reader.ranges.count <= 3)
 }
 
 @Test(
@@ -58,7 +71,7 @@ private func findSamples(in folder: URL) -> [AudioFileFormat: URL] {
     return result
 }
 
-private func makeAPEFixture() -> Data {
+private func makeAPEFixture(audioPayloadSize: Int = 16) -> Data {
     var descriptor = Data("MAC ".utf8)
     descriptor.appendLittleEndian(UInt16(3990))
     descriptor.appendLittleEndian(UInt16(52))
@@ -104,7 +117,28 @@ private func makeAPEFixture() -> Data {
     footer.appendLittleEndian(UInt32(values.count))
     footer.appendLittleEndian(UInt32(0))
     footer.append(Data(repeating: 0, count: 8))
-    return descriptor + header + Data(repeating: 0, count: 16) + items + footer
+    return descriptor + header + Data(repeating: 0, count: audioPayloadSize) + items + footer
+}
+
+private final class TrackingAPEByteReader: APEByteReading {
+    let size: Int
+    private let data: Data
+    private(set) var ranges: [Range<Int>] = []
+
+    init(data: Data) {
+        self.data = data
+        size = data.count
+    }
+
+    var totalRequestedBytes: Int {
+        ranges.reduce(0) { $0 + $1.count }
+    }
+
+    func read(offset: Int, count: Int) throws -> Data {
+        let range = offset..<min(offset + count, data.count)
+        ranges.append(range)
+        return Data(data[range])
+    }
 }
 
 private extension Data {

@@ -21,6 +21,7 @@ public actor ArtworkCache {
         try data.write(to: rootURL.appending(path: key), options: .atomic)
         var updated = track
         updated.metadata.artworkCacheKey = key
+        updated.metadata.artworkData = nil
         return updated
     }
 

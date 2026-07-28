@@ -18,5 +18,6 @@ func persistsArtworkSeparately() async throws {
     let updated = try await cache.persistArtwork(in: track)
 
     let key = try #require(updated.metadata.artworkCacheKey)
+    #expect(updated.metadata.artworkData == nil)
     #expect(try await cache.data(for: key) == artwork)
 }

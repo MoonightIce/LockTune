@@ -44,6 +44,24 @@ func skipsDamagedBookmark() throws {
     #expect(second.failedBookmarkCount == 0)
 }
 
+@MainActor
+@Test("All authorized music folders can be cleared")
+func clearsAllFolderBookmarks() throws {
+    let suite = "app.locktune.tests.\(UUID())"
+    let defaults = try #require(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let first = URL(fileURLWithPath: "/Music/First")
+    let second = URL(fileURLWithPath: "/Music/Second")
+    let store = SecurityScopedFolderStore(defaults: defaults, bookmarker: TestBookmarker())
+    try store.add(first)
+    try store.add(second)
+
+    store.removeAll()
+
+    #expect(store.resolveAll().urls.isEmpty)
+    #expect((defaults.array(forKey: "musicFolderBookmarks") ?? []).isEmpty)
+}
+
 private struct TestBookmarker: SecurityScopedBookmarking {
     func create(for url: URL) throws -> Data {
         Data(url.path.utf8)

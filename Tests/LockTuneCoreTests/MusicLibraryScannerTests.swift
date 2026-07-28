@@ -24,6 +24,29 @@ func scansSupportedFiles() async throws {
     #expect(snapshot.issues.isEmpty)
 }
 
+@Test("Scanner publishes determinate discovery and indexing progress")
+func publishesScanProgress() async throws {
+    let folder = FileManager.default.temporaryDirectory
+        .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    try Data("first".utf8).write(to: folder.appending(path: "First.mp3"))
+    try Data("second".utf8).write(to: folder.appending(path: "Second.flac"))
+    let recorder = MusicScanProgressRecorder()
+
+    _ = await MusicLibraryScanner(metadataReader: FixedMetadataReader()).scan(
+        folderURLs: [folder]
+    ) { progress in
+        await recorder.append(progress)
+    }
+
+    let updates = await recorder.updates()
+    #expect(updates.first == MusicScanProgress(phase: .discovering, completed: 0, total: 1))
+    #expect(updates.contains(MusicScanProgress(phase: .discovering, completed: 1, total: 1)))
+    #expect(updates.contains(MusicScanProgress(phase: .indexing, completed: 0, total: 2)))
+    #expect(updates.last == MusicScanProgress(phase: .indexing, completed: 2, total: 2))
+}
+
 @Test("Exact duplicate files share one track and retain both locations")
 func deduplicatesExactFileContent() async throws {
     let folder = FileManager.default.temporaryDirectory
@@ -59,6 +82,115 @@ func reusesPreviousSnapshot() async throws {
     #expect(second.locations.count == 1)
     #expect(second.tracks.first?.id == first.tracks.first?.id)
     #expect(second.locations.first?.id == first.locations.first?.id)
+}
+
+@Test("Scanning a newly added folder retains old locations without rereading them")
+func scansOnlyNewlyAddedFolder() async throws {
+    let root = FileManager.default.temporaryDirectory
+        .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    let firstFolder = root.appending(path: "First", directoryHint: .isDirectory)
+    let secondFolder = root.appending(path: "Second", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: firstFolder, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: secondFolder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let firstFile = firstFolder.appending(path: "First.mp3")
+    let secondFile = secondFolder.appending(path: "Second.flac")
+    try Data("first".utf8).write(to: firstFile)
+    try Data("second".utf8).write(to: secondFile)
+    let reader = RecordingMetadataReader()
+    let scanner = MusicLibraryScanner(metadataReader: reader)
+
+    let first = await scanner.scan(folderURLs: [firstFolder])
+    let second = await scanner.scan(folderURLs: [secondFolder], previous: first)
+
+    #expect(
+        Set(second.locations.map(\.url.standardizedFileURL))
+            == [firstFile.standardizedFileURL, secondFile.standardizedFileURL]
+    )
+    #expect(
+        await reader.readURLs().map(\.standardizedFileURL)
+            == [firstFile.standardizedFileURL, secondFile.standardizedFileURL]
+    )
+}
+
+@Test("Removing every authorized root clears rebuildable index state")
+func clearsSnapshotWithoutAuthorizedRoots() {
+    let track = Track(
+        contentFingerprint: "fingerprint",
+        metadata: TrackMetadata(title: "Track", status: .partial)
+    )
+    let location = TrackLocation(
+        trackID: track.id,
+        url: URL(fileURLWithPath: "/Music/Track.mp3"),
+        format: .mp3
+    )
+    let snapshot = MusicLibrarySnapshot(
+        tracks: [track],
+        locations: [location],
+        issues: [MusicScanIssue(url: location.url, reason: .unreadable)],
+        scanState: MusicScanState(lastCompletedAt: Date())
+    )
+
+    let cleared = snapshot.retainingAuthorizedRoots([])
+
+    #expect(cleared.tracks.isEmpty)
+    #expect(cleared.locations.isEmpty)
+    #expect(cleared.issues.isEmpty)
+    #expect(cleared.scanState.lastCompletedAt == nil)
+}
+
+@Test("Cancelling a scan stops before all metadata is read")
+func cancelsScan() async throws {
+    let folder = FileManager.default.temporaryDirectory
+        .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    for index in 0..<80 {
+        try Data("audio-\(index)".utf8).write(
+            to: folder.appending(path: "\(index).mp3")
+        )
+    }
+    let reader = SlowMetadataReader()
+    let scanner = MusicLibraryScanner(metadataReader: reader)
+    let task = Task {
+        await scanner.scan(folderURLs: [folder])
+    }
+    while await reader.readCount() == 0 {
+        await Task.yield()
+    }
+
+    task.cancel()
+    _ = await task.value
+
+    #expect(await reader.readCount() < 80)
+}
+
+@Test("Progress updates are throttled but phase boundaries are preserved")
+func throttlesScanProgress() async throws {
+    let folder = FileManager.default.temporaryDirectory
+        .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    for index in 0..<40 {
+        try Data("audio-\(index)".utf8).write(
+            to: folder.appending(path: "\(index).mp3")
+        )
+    }
+    let recorder = MusicScanProgressRecorder()
+
+    _ = await MusicLibraryScanner(metadataReader: FixedMetadataReader()).scan(
+        folderURLs: [folder],
+        progressMinimumInterval: .seconds(60)
+    ) { progress in
+        await recorder.append(progress)
+    }
+
+    let updates = await recorder.updates()
+    #expect(updates.count <= 5)
+    #expect(updates.first == MusicScanProgress(phase: .discovering, completed: 0, total: 1))
+    #expect(updates.contains(MusicScanProgress(phase: .discovering, completed: 1, total: 1)))
+    #expect(updates.contains(MusicScanProgress(phase: .indexing, completed: 0, total: 40)))
+    #expect(updates.last == MusicScanProgress(phase: .indexing, completed: 40, total: 40))
 }
 
 @Test("Changed content at the same location replaces the old track")
@@ -172,5 +304,44 @@ private struct FixedMetadataReader: AudioMetadataReading {
 private struct UnavailableMetadataReader: AudioMetadataReading {
     func metadata(for url: URL, format: AudioFileFormat) async -> TrackMetadata {
         TrackMetadata(status: .unavailable)
+    }
+}
+
+private actor RecordingMetadataReader: AudioMetadataReading {
+    private var urls: [URL] = []
+
+    func metadata(for url: URL, format: AudioFileFormat) async -> TrackMetadata {
+        urls.append(url)
+        return TrackMetadata(title: url.deletingPathExtension().lastPathComponent, status: .partial)
+    }
+
+    func readURLs() -> [URL] {
+        urls
+    }
+}
+
+private actor SlowMetadataReader: AudioMetadataReading {
+    private var count = 0
+
+    func metadata(for url: URL, format: AudioFileFormat) async -> TrackMetadata {
+        count += 1
+        try? await Task.sleep(for: .milliseconds(10))
+        return TrackMetadata(title: url.lastPathComponent, status: .partial)
+    }
+
+    func readCount() -> Int {
+        count
+    }
+}
+
+private actor MusicScanProgressRecorder {
+    private var values: [MusicScanProgress] = []
+
+    func append(_ progress: MusicScanProgress) {
+        values.append(progress)
+    }
+
+    func updates() -> [MusicScanProgress] {
+        values
     }
 }

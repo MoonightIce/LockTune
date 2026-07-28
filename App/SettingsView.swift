@@ -3,9 +3,50 @@ import SwiftUI
 struct SettingsView: View {
     @Bindable var session: AppSession
     @State private var isShowingDisconnectConfirmation = false
+    @State private var folderPendingRemoval: URL?
+    @State private var isShowingClearFoldersConfirmation = false
 
     var body: some View {
         Form {
+            Section("settings.musicFolders") {
+                if session.musicFolders.isEmpty {
+                    Text("settings.musicFoldersEmpty")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(session.musicFolders, id: \.standardizedFileURL) { folder in
+                        HStack(spacing: 10) {
+                            Image(systemName: "folder")
+                                .foregroundStyle(.secondary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(folder.lastPathComponent)
+                                Text(folder.path)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                            }
+                            Spacer()
+                            Button("settings.musicFolderRemove", role: .destructive) {
+                                folderPendingRemoval = folder
+                            }
+                            .disabled(session.isScanningMusic)
+                        }
+                    }
+                }
+                HStack {
+                    Button("library.addFolder", systemImage: "folder.badge.plus") {
+                        Task { await session.chooseMusicFolder() }
+                    }
+                    .disabled(session.isScanningMusic)
+                    Spacer()
+                    if !session.musicFolders.isEmpty {
+                        Button("settings.musicFoldersClear", role: .destructive) {
+                            isShowingClearFoldersConfirmation = true
+                        }
+                        .disabled(session.isScanningMusic)
+                    }
+                }
+            }
             Section("settings.general") {
                 Toggle(
                     "settings.islandEnabled",
@@ -40,7 +81,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 560, height: 420)
+        .frame(width: 620, height: 560)
         .confirmationDialog(
             "settings.disconnectConfirmationTitle",
             isPresented: $isShowingDisconnectConfirmation,
@@ -52,6 +93,38 @@ struct SettingsView: View {
             Button("settings.cancel", role: .cancel) {}
         } message: {
             Text("settings.disconnectConfirmationMessage")
+        }
+        .confirmationDialog(
+            "settings.musicFolderRemoveConfirmation",
+            isPresented: Binding(
+                get: { folderPendingRemoval != nil },
+                set: { if !$0 { folderPendingRemoval = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let folderPendingRemoval {
+                Button("settings.musicFolderRemove", role: .destructive) {
+                    Task { await session.removeMusicFolder(folderPendingRemoval) }
+                    self.folderPendingRemoval = nil
+                }
+            }
+            Button("settings.cancel", role: .cancel) {
+                folderPendingRemoval = nil
+            }
+        } message: {
+            Text("settings.musicFolderRemoveMessage")
+        }
+        .confirmationDialog(
+            "settings.musicFoldersClearConfirmation",
+            isPresented: $isShowingClearFoldersConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("settings.musicFoldersClear", role: .destructive) {
+                Task { await session.clearMusicFolders() }
+            }
+            Button("settings.cancel", role: .cancel) {}
+        } message: {
+            Text("settings.musicFoldersClearMessage")
         }
     }
 
