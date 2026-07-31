@@ -9,7 +9,7 @@ struct LockTuneApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView(session: session)
-                .frame(minWidth: 920, minHeight: 620)
+                .frame(minWidth: 1_180, minHeight: 720)
                 .task {
                     islandWindow.show(session: session)
                     await session.restoreMusicLibrary()

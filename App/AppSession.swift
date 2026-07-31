@@ -29,6 +29,7 @@ final class AppSession {
     var isIslandEnabled: Bool
     var lastMusicScan: Date? { musicLibrary.scanState.lastCompletedAt }
     var musicLibraryError: String?
+    var musicLibraryNotice: String?
     var currentTrackTitle: String {
         playback.currentItem?.title ?? String(localized: "player.nothingPlaying")
     }
@@ -321,6 +322,7 @@ final class AppSession {
         isScanningMusic = true
         musicScanProgress = MusicScanProgress(phase: .discovering, completed: 0, total: 0)
         musicLibraryError = nil
+        musicLibraryNotice = nil
         defer {
             isScanningMusic = false
             musicScanProgress = nil
@@ -445,6 +447,76 @@ final class AppSession {
     func setPlaybackOrder(_ order: PlaybackOrder) async { await playbackController.setOrder(order) }
     func setRepeatMode(_ mode: PlaybackRepeatMode) async { await playbackController.setRepeatMode(mode) }
     func retryPlayback() async { await playbackController.retry() }
+
+    func canRepairMusicMetadata() -> Bool {
+        musicLibrary.tracks.contains { FilenameMetadataRepair.needsRepair($0.metadata) }
+    }
+
+    func repairMusicMetadata() async {
+        guard !isScanningMusic else { return }
+        musicLibraryError = nil
+        musicLibraryNotice = nil
+        let writer = MP3TitleWriter()
+        var suspectTracks = 0
+        var repairedTracks = 0
+        var repairedFields = 0
+        var writtenFiles = 0
+        var pendingNonMP3Files = 0
+        var failedFiles = 0
+        var unresolvedTracks = 0
+
+        for index in musicLibrary.tracks.indices {
+            let original = musicLibrary.tracks[index]
+            guard FilenameMetadataRepair.needsRepair(original.metadata) else { continue }
+            suspectTracks += 1
+            let locations = musicLibrary.locations.filter { $0.trackID == original.id }
+            let mp3Locations = locations.filter { $0.format == .mp3 }
+            guard !mp3Locations.isEmpty else {
+                pendingNonMP3Files += max(locations.count, 1)
+                continue
+            }
+            let suggestion = FilenameMetadataRepair.suggestion(for: mp3Locations[0].url, metadata: original.metadata)
+            let title = FilenameMetadataRepair.isUnknownOrGarbled(original.metadata.title) ? suggestion.title : nil
+            let artist = FilenameMetadataRepair.isUnknownOrGarbled(original.metadata.artist) ? suggestion.artist : nil
+            let album = FilenameMetadataRepair.isUnknownOrGarbled(original.metadata.album) ? suggestion.album : nil
+            guard title != nil || artist != nil || album != nil else {
+                unresolvedTracks += 1
+                continue
+            }
+            var writtenForTrack = 0
+            for location in mp3Locations {
+                do {
+                    try writer.writeMetadata(title: title, artist: artist, album: album, to: location.url)
+                    writtenFiles += 1
+                    writtenForTrack += 1
+                } catch {
+                    failedFiles += 1
+                }
+            }
+            guard writtenForTrack > 0 else {
+                unresolvedTracks += 1
+                continue
+            }
+            var track = original
+            if let title { track.metadata.title = title; repairedFields += 1 }
+            if let artist { track.metadata.artist = artist; repairedFields += 1 }
+            if let album { track.metadata.album = album; repairedFields += 1 }
+            if track.metadata.status == .unavailable { track.metadata.status = .partial }
+            musicLibrary.tracks[index] = track
+            repairedTracks += 1
+        }
+
+        do {
+            if repairedTracks > 0, let indexStore { try await indexStore.save(musicLibrary) }
+            var message = "已检查 \(suspectTracks) 个异常文件；MP3 修复 \(repairedTracks) 个，写回 \(writtenFiles) 个文件，更新 \(repairedFields) 项信息。"
+            if pendingNonMP3Files > 0 { message += " \(pendingNonMP3Files) 个非 MP3 文件待确认修复方案。" }
+            if failedFiles > 0 { message += " \(failedFiles) 个文件写回失败。" }
+            if unresolvedTracks > 0 { message += " \(unresolvedTracks) 个文件无法从文件名或目录安全推断。" }
+            musicLibraryNotice = message
+        } catch {
+            musicLibraryError = "保存修复结果失败：\(error.localizedDescription)"
+        }
+    }
 
     func toggleFavorite(trackID: UUID) async {
         if favoriteTrackIDs.contains(trackID) {

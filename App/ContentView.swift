@@ -9,13 +9,33 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            NavigationSplitView {
-                List(SidebarItem.allCases, selection: $selection) { item in
-                    Label(item.title, systemImage: item.systemImage)
-                        .tag(item)
+            HStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(spacing: 12) {
+                        LockTuneBrandMark().frame(width: 36, height: 36)
+                        Text("app.name").font(.title3.weight(.bold))
+                    }
+                    .padding(.horizontal, 23).padding(.top, 25).padding(.bottom, 28)
+                    VStack(spacing: 8) {
+                        ForEach(SidebarItem.allCases) { item in
+                            Button { selection = item } label: {
+                                Label(item.title, systemImage: item.systemImage)
+                                    .font(.system(size: 14, weight: selection == item ? .semibold : .regular))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 15).frame(height: 46)
+                                    .background(selection == item ? Color.white.opacity(0.9) : .clear,
+                                                in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            }.buttonStyle(.plain)
+                        }
+                    }.padding(.horizontal, 15)
+                    Spacer()
+                    VStack(alignment: .leading, spacing: 5) {
+                        Label("本地音乐库", systemImage: "circle.fill").font(.callout).foregroundStyle(.secondary)
+                        Text("\(session.musicLibrary.tracks.count) 首歌曲").font(.caption).foregroundStyle(.tertiary).padding(.leading, 20)
+                    }.padding(.horizontal, 25).padding(.bottom, 25)
                 }
-                .navigationTitle("app.name")
-            } detail: {
+                .frame(width: 218).background(Color(red: 0.925, green: 0.932, blue: 0.955))
+                Divider()
                 detail
             }
 
@@ -31,8 +51,6 @@ struct ContentView: View {
             MusicLibraryView(session: session)
         case .nowPlaying:
             NowPlayingView(session: session)
-        case .calendar:
-            CalendarView(session: session)
         }
     }
 }
@@ -42,100 +60,52 @@ private struct MusicLibraryView: View {
     @State private var selectedTrackID: Track.ID?
     @State private var searchText = ""
     @State private var browseMode: LibraryBrowseMode = .songs
+    @State private var isCalendarPanelVisible = true
 
     var body: some View {
-        Group {
-            if session.musicLibrary.tracks.isEmpty {
-                if session.musicScanProgress == nil {
-                    ContentUnavailableView {
-                        Label("sidebar.library", systemImage: "music.note.list")
-                    } description: {
-                        Text("placeholder.library")
-                    } actions: {
-                        Button("library.addFolder", systemImage: "folder.badge.plus") {
-                            Task { await session.chooseMusicFolder() }
-                        }
-                    }
-                } else {
-                    Color.clear
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .accessibilityHidden(true)
-                }
-            } else {
-                Table(sortedRows, selection: $selectedTrackID) {
-                    TableColumn("library.title") { row in
-                        let track = row.track
-                        HStack(spacing: 8) {
-                            artwork(track)
-                            Button {
-                                Task { await session.toggleFavorite(trackID: track.id) }
-                            } label: {
-                                Image(systemName: session.favoriteTrackIDs.contains(track.id) ? "heart.fill" : "heart")
-                                    .foregroundStyle(session.favoriteTrackIDs.contains(track.id) ? .red : .secondary)
-                            }
-                            .buttonStyle(.plain)
-                            .help(session.favoriteTrackIDs.contains(track.id) ? "library.unfavorite" : "library.favorite")
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(track.metadata.title ?? String(localized: "library.unknownTitle"))
-                                if track.metadata.status != .complete {
-                                    Text(track.metadata.status == .unavailable
-                                         ? "library.metadataUnavailable"
-                                         : "library.metadataPartial")
-                                        .font(.caption)
-                                        .foregroundStyle(track.metadata.status == .unavailable ? .red : .secondary)
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Menu { Picker("library.browse", selection: $browseMode) { ForEach(LibraryBrowseMode.allCases) { Label($0.title, systemImage: $0.systemImage).tag($0) } } } label: { Label(browseMode.title, systemImage: browseMode.systemImage) }.menuStyle(.borderlessButton)
+                Button("library.refresh", systemImage: "arrow.clockwise") { Task { await session.scanMusicFolders() } }.labelStyle(.iconOnly).disabled(session.musicFolders.isEmpty || session.isScanningMusic)
+                Button("library.addFolder", systemImage: "folder.badge.plus") { Task { await session.chooseMusicFolder() } }.labelStyle(.iconOnly).disabled(session.isScanningMusic)
+                Button("文件信息修复", systemImage: "text.badge.plus") { Task { await session.repairMusicMetadata() } }.labelStyle(.titleAndIcon).disabled(!session.canRepairMusicMetadata() || session.isScanningMusic)
+                Button { withAnimation(.easeInOut(duration: 0.2)) { isCalendarPanelVisible.toggle() } } label: { Label(isCalendarPanelVisible ? "隐藏日历" : "显示日历", systemImage: isCalendarPanelVisible ? "calendar.badge.minus" : "calendar.badge.plus") }.buttonStyle(.bordered)
+                Spacer()
+                TextField("搜索音乐", text: $searchText).textFieldStyle(.roundedBorder).frame(width: 180)
+            }.padding(.horizontal, 20).frame(height: 54).background(Color.white.opacity(0.86))
+            Divider()
+            HStack(spacing: 0) {
+                VStack(spacing: 0) {
+                    HStack(alignment: .bottom) {
+                        VStack(alignment: .leading, spacing: 8) { Text("音乐库").font(.caption).foregroundStyle(.secondary); Text("你的声音收藏").font(.system(size: 30, weight: .medium, design: .rounded)) }
+                        Spacer()
+                        Button("播放全部", systemImage: "play.fill") { if let first = sortedRows.first { Task { await session.play(trackID: first.id) } } }.buttonStyle(.borderedProminent).tint(.black).disabled(sortedRows.isEmpty || session.isScanningMusic)
+                    }.padding(.horizontal, 30).padding(.top, 27).padding(.bottom, 20)
+                    if session.musicLibrary.tracks.isEmpty {
+                        ContentUnavailableView { Label("sidebar.library", systemImage: "music.note.list") } description: { Text("placeholder.library") } actions: { Button("library.addFolder", systemImage: "folder.badge.plus") { Task { await session.chooseMusicFolder() } } }
+                    } else {
+                        List(selection: $selectedTrackID) {
+                            ForEach(sortedRows) { row in
+                                let track = row.track
+                                HStack(spacing: 12) {
+                                    artwork(track)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(track.metadata.title ?? String(localized: "library.unknownTitle")).fontWeight(selectedTrackID == track.id ? .semibold : .regular).lineLimit(1)
+                                        Text(track.metadata.artist ?? String(localized: "library.unknown")).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                    }.frame(minWidth: 260, maxWidth: .infinity, alignment: .leading)
+                                    Text(track.metadata.album ?? String(localized: "library.unknown")).foregroundStyle(.secondary).lineLimit(1).frame(width: 190, alignment: .leading)
+                                    Text(duration(track.metadata.duration)).font(.caption.monospacedDigit()).foregroundStyle(.secondary).frame(width: 58, alignment: .trailing)
                                 }
+                                .padding(.horizontal, 18).padding(.vertical, 4).contentShape(Rectangle())
+                                .tag(track.id)
+                                .listRowBackground(RoundedRectangle(cornerRadius: 9).fill(selectedTrackID == track.id ? Color.accentColor.opacity(0.14) : .clear).padding(.horizontal, 8))
+                                .onTapGesture { selectedTrackID = track.id }
+                                .simultaneousGesture(TapGesture(count: 2).onEnded { Task { await session.play(trackID: track.id) } })
                             }
-                        }
-                        .contentShape(Rectangle())
-                        .onTapGesture(count: 2) {
-                            Task { await session.play(trackID: track.id) }
-                        }
+                        }.listStyle(.plain).scrollContentBackground(.hidden).background(Color.white)
                     }
-                    TableColumn("library.artist") { row in
-                        Text(row.track.metadata.artist ?? String(localized: "library.unknown"))
-                    }
-                    TableColumn("library.album") { row in
-                        Text(row.track.metadata.album ?? String(localized: "library.unknown"))
-                    }
-                    TableColumn("library.trackNumber") { row in
-                        Text(row.track.metadata.trackNumber.map(String.init)
-                             ?? String(localized: "library.unknown"))
-                    }
-                    .width(72)
-                    TableColumn("library.duration") { row in
-                        Text(duration(row.track.metadata.duration))
-                            .monospacedDigit()
-                    }
-                    .width(72)
-                    TableColumn("library.folder") { row in
-                        Text(row.folderName)
-                    }
-                }
-            }
-        }
-        .navigationTitle("sidebar.library")
-        .searchable(text: $searchText, prompt: "library.search")
-        .toolbar {
-            ToolbarItemGroup {
-                Picker("library.browse", selection: $browseMode) {
-                    ForEach(LibraryBrowseMode.allCases) { mode in
-                        Label(mode.title, systemImage: mode.systemImage).tag(mode)
-                    }
-                }
-                .pickerStyle(.menu)
-                Button("player.playSelected", systemImage: "play.fill") {
-                    guard let selectedTrackID else { return }
-                    Task { await session.play(trackID: selectedTrackID) }
-                }
-                .disabled(selectedTrackID == nil || session.isScanningMusic)
-                Button("library.refresh", systemImage: "arrow.clockwise") {
-                    Task { await session.scanMusicFolders() }
-                }
-                .disabled(session.musicFolders.isEmpty || session.isScanningMusic)
-                Button("library.addFolder", systemImage: "folder.badge.plus") {
-                    Task { await session.chooseMusicFolder() }
-                }
-                .disabled(session.isScanningMusic)
+                }.frame(maxWidth: .infinity).background(Color.white)
+                if isCalendarPanelVisible { Divider(); CompactCalendarPanel(session: session).frame(width: 310) }
             }
         }
         .overlay(alignment: .topTrailing) {
@@ -184,6 +154,10 @@ private struct MusicLibraryView: View {
                         .padding(10)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(.bar)
+                }
+                if let notice = session.musicLibraryNotice {
+                    Divider()
+                    Text(notice).font(.callout).foregroundStyle(.green).padding(10).frame(maxWidth: .infinity, alignment: .leading).background(.bar)
                 }
             }
         }
@@ -697,10 +671,59 @@ private struct CalendarEventRow: View {
     }
 }
 
+private struct LockTuneBrandMark: View {
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Color(red: 0.24, green: 0.37, blue: 0.82))
+            Circle().fill(Color(red: 1, green: 0.39, blue: 0.39)).frame(width: 23, height: 23).offset(x: 10, y: -10)
+            Circle().fill(Color(red: 0.93, green: 0.79, blue: 0.58)).frame(width: 17, height: 17).offset(x: -11, y: 12)
+        }.clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+    }
+}
+
+private struct CompactCalendarPanel: View {
+    @Bindable var session: AppSession
+
+    private var events: [CalendarEvent] { Array(session.upcomingTimedEvents.prefix(3)) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(Date.now.formatted(.dateTime.weekday(.wide))).foregroundStyle(.secondary)
+                Text(Calendar.current.component(.day, from: .now).formatted()).font(.system(size: 40, weight: .bold, design: .rounded))
+                Text(Date.now.formatted(.dateTime.month(.abbreviated))).foregroundStyle(.secondary)
+            }.padding(.top, 35)
+            Text("接下来的日程").font(.callout).foregroundStyle(.secondary).padding(.top, 33).padding(.bottom, 15)
+            if events.isEmpty {
+                VStack(spacing: 12) {
+                    Image(systemName: session.calendarConnectionState == .connected ? "calendar.badge.checkmark" : "calendar.badge.plus").font(.title2).foregroundStyle(.secondary)
+                    Text(session.calendarConnectionState == .connected ? "今天没有更多日程" : "连接 Google 日历").foregroundStyle(.secondary)
+                }.frame(maxWidth: .infinity).padding(.vertical, 35)
+            } else {
+                VStack(spacing: 11) {
+                    ForEach(events) { event in
+                        HStack(spacing: 12) {
+                            Text(event.start.formatted(date: .omitted, time: .shortened)).font(.caption.monospacedDigit()).foregroundStyle(.secondary).frame(width: 50, alignment: .leading)
+                            RoundedRectangle(cornerRadius: 2).fill(Color.accentColor).frame(width: 4, height: 37)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(event.title.isEmpty ? "未命名日程" : event.title).font(.callout.weight(.semibold)).lineLimit(1)
+                                Text(event.meetURL == nil ? (event.location ?? "日历") : "Google Meet").font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                            Spacer(minLength: 0)
+                            if let url = event.meetURL { Link(destination: url) { Image(systemName: "video.fill") }.buttonStyle(.plain) }
+                        }.padding(.horizontal, 13).frame(height: 74).background(Color.white.opacity(0.88), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                    }
+                }
+            }
+            Spacer()
+            Text(session.calendarConnectionState == .connected ? "Google 日历已同步" : "Google 日历未连接").font(.caption).foregroundStyle(.secondary).padding(.bottom, 25)
+        }.padding(.horizontal, 23).background(Color(red: 0.94, green: 0.946, blue: 0.962))
+    }
+}
+
 private enum SidebarItem: String, CaseIterable, Identifiable {
     case library
     case nowPlaying
-    case calendar
 
     var id: Self { self }
 
@@ -708,7 +731,6 @@ private enum SidebarItem: String, CaseIterable, Identifiable {
         switch self {
         case .library: "sidebar.library"
         case .nowPlaying: "sidebar.nowPlaying"
-        case .calendar: "sidebar.calendar"
         }
     }
 
@@ -716,7 +738,6 @@ private enum SidebarItem: String, CaseIterable, Identifiable {
         switch self {
         case .library: "music.note.list"
         case .nowPlaying: "play.circle"
-        case .calendar: "calendar"
         }
     }
 }
