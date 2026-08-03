@@ -679,6 +679,48 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在当前显示器顶部展示播放状态和即将开始的会议。" } }
       }
     },
+    "settings.glassBlur" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Background blur" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "背景模糊" } }
+      }
+    },
+    "settings.glassBoundaryNote" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Refraction is limited to the view border; content stays clear." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "折射只作用于视图边框，主体内容保持清晰。" } }
+      }
+    },
+    "settings.glassContentClear" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Content stays clear" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "内容层不参与折射" } }
+      }
+    },
+    "settings.glassLaboratory" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "CSS laboratory" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "CSS laboratory" } }
+      }
+    },
+    "settings.glassMotion" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Move background highlights" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "背景实时移动" } }
+      }
+    },
+    "settings.glassRefraction" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Edge refraction" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "边缘折射" } }
+      }
+    },
+    "settings.glassTint" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Tint opacity" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "染色透明度" } }
+      }
+    },
     "settings.privacy" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Privacy" } },

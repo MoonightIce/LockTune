@@ -30,9 +30,7 @@ final class IslandWindowController {
         panel.hidesOnDeactivate = false
         panel.isMovable = false
         panel.setAccessibilityLabel(String(localized: "island.accessibility"))
-        let hostingView = NSHostingView(rootView: IslandView(session: session))
-        hostingView.translatesAutoresizingMaskIntoConstraints = false
-        panel.contentView = IslandMaterialHostView(contentView: hostingView)
+        panel.contentView = NSHostingView(rootView: IslandView(session: session))
         self.panel = panel
         reposition()
         installObservers()
@@ -128,70 +126,6 @@ private final class IslandPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
-private final class IslandMaterialHostView: NSView {
-    init(contentView: NSView) {
-        super.init(frame: .zero)
-
-        wantsLayer = true
-        layer?.backgroundColor = NSColor.clear.cgColor
-
-        let materialView: NSView
-        if #available(macOS 26.0, *) {
-            let glassView = NSGlassEffectView()
-            glassView.contentView = contentView
-            glassView.cornerRadius = 999
-            glassView.style = .clear
-            glassView.tintColor = nil
-            materialView = glassView
-        } else {
-            materialView = IslandFallbackMaterialView(contentView: contentView)
-        }
-
-        materialView.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(materialView)
-        NSLayoutConstraint.activate([
-            materialView.centerXAnchor.constraint(equalTo: centerXAnchor),
-            materialView.centerYAnchor.constraint(equalTo: centerYAnchor),
-            materialView.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor),
-            materialView.heightAnchor.constraint(lessThanOrEqualTo: heightAnchor)
-        ])
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-}
-
-private final class IslandFallbackMaterialView: NSVisualEffectView {
-    init(contentView: NSView) {
-        super.init(frame: .zero)
-
-        // Older systems can sample the live window behind the island, but do
-        // not provide Liquid Glass lensing. Avoid a fixed popover tint so this
-        // remains an honest, transparent compatibility material.
-        material = .underWindowBackground
-        blendingMode = .behindWindow
-        state = .active
-        isEmphasized = false
-        wantsLayer = true
-        layer?.cornerRadius = 32
-        layer?.cornerCurve = .continuous
-        layer?.masksToBounds = true
-
-        addSubview(contentView)
-        NSLayoutConstraint.activate([
-            contentView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            contentView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            contentView.topAnchor.constraint(equalTo: topAnchor),
-            contentView.bottomAnchor.constraint(equalTo: bottomAnchor)
-        ])
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-}
-
 private extension NSScreen {
     var displayID: CGDirectDisplayID? {
         deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
@@ -225,44 +159,49 @@ private struct IslandView: View {
     }
 
     private var islandContent: some View {
-        HStack(spacing: 12) {
-            icon
-                .font(.title3)
-                .frame(width: 34, height: 34)
-                .background(.white.opacity(0.12), in: Circle())
+        ZStack {
+            Color.white.opacity(session.glassTint)
+                .clipShape(RoundedRectangle(cornerRadius: geometry.cornerRadius, style: .continuous))
+            GlassEdgeMaterial(session: session, cornerRadius: geometry.cornerRadius)
+            HStack(spacing: 12) {
+                icon
+                    .font(.title3)
+                    .frame(width: 34, height: 34)
+                    .background(.white.opacity(0.12), in: Circle())
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(primaryText)
-                    .font(.headline)
-                    .lineLimit(1)
-                Text(secondaryText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-
-            Spacer(minLength: 8)
-
-            if presentation == .meeting, let meetURL = session.nextMeeting?.meetURL {
-                Button {
-                    NSWorkspace.shared.open(meetURL)
-                } label: {
-                    Image(systemName: "video.fill")
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(primaryText)
+                        .font(.headline)
+                        .lineLimit(1)
+                    Text(secondaryText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
-                .buttonStyle(.borderedProminent)
-                .help("calendar.joinMeet")
-            } else if presentation == .music {
-                Button {
-                    Task { await session.togglePlayPause() }
-                } label: {
-                    Image(systemName: session.playback.phase == .playing ? "pause.fill" : "play.fill")
+
+                Spacer(minLength: 8)
+
+                if presentation == .meeting, let meetURL = session.nextMeeting?.meetURL {
+                    Button {
+                        NSWorkspace.shared.open(meetURL)
+                    } label: {
+                        Image(systemName: "video.fill")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .help("calendar.joinMeet")
+                } else if presentation == .music {
+                    Button {
+                        Task { await session.togglePlayPause() }
+                    } label: {
+                        Image(systemName: session.playback.phase == .playing ? "pause.fill" : "play.fill")
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
+            .padding(.horizontal, 15)
+            .foregroundStyle(.primary)
         }
-        .padding(.horizontal, 15)
         .frame(width: geometry.width, height: geometry.height)
-        .foregroundStyle(.primary)
     }
 
     private var presentation: IslandPresentation { session.islandPresentation }
@@ -307,6 +246,127 @@ private struct IslandView: View {
         case .idle:
             return String(localized: "island.idle")
         }
+    }
+}
+
+struct GlassEdgeMaterial: View {
+    @Bindable var session: AppSession
+    let cornerRadius: CGFloat
+
+    private var edgeWidth: CGFloat {
+        2 + CGFloat(session.glassRefraction) / 16
+    }
+
+    var body: some View {
+        ZStack {
+            EdgeMaterialView(
+                tint: session.glassTint,
+                edgeWidth: edgeWidth,
+                cornerRadius: cornerRadius
+            )
+            .blur(radius: CGFloat(session.glassBlur) / 6)
+            .mask(edgeMask)
+
+            if session.glassMotionEnabled {
+                TimelineView(.animation(minimumInterval: 1 / 30)) { context in
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .stroke(
+                            AngularGradient(
+                                colors: [.white.opacity(0.04), .white.opacity(0.3), .white.opacity(0.04)],
+                                center: .center,
+                                angle: .degrees(context.date.timeIntervalSinceReferenceDate * 16)
+                            ),
+                            lineWidth: 1.5 + CGFloat(session.glassRefraction) / 24
+                        )
+                }
+            }
+        }
+        .opacity(0.35 + session.glassRefraction / 250)
+        .allowsHitTesting(false)
+    }
+
+    private var edgeMask: some View {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .stroke(.white, lineWidth: edgeWidth)
+    }
+}
+
+private struct EdgeMaterialView: NSViewRepresentable {
+    let tint: Double
+    let edgeWidth: CGFloat
+    let cornerRadius: CGFloat
+
+    func makeNSView(context: Context) -> EdgeMaterialHostView {
+        EdgeMaterialHostView()
+    }
+
+    func updateNSView(_ view: EdgeMaterialHostView, context: Context) {
+        view.update(tint: tint, edgeWidth: edgeWidth, cornerRadius: cornerRadius)
+    }
+}
+
+private final class EdgeMaterialHostView: NSView {
+    private let materialView: NSView
+    private let maskLayer = CAShapeLayer()
+    private var edgeWidth: CGFloat = 8
+    private var cornerRadius: CGFloat = 28
+
+    override init(frame frameRect: NSRect) {
+        if #available(macOS 26.0, *) {
+            let glassView = NSGlassEffectView()
+            glassView.style = .clear
+            glassView.cornerRadius = 0
+            materialView = glassView
+        } else {
+            let effectView = NSVisualEffectView()
+            effectView.material = .underWindowBackground
+            effectView.blendingMode = .behindWindow
+            effectView.state = .active
+            effectView.isEmphasized = false
+            materialView = effectView
+        }
+        super.init(frame: frameRect)
+        wantsLayer = true
+        materialView.wantsLayer = true
+        materialView.layer?.mask = maskLayer
+        addSubview(materialView)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func update(tint: Double, edgeWidth: CGFloat, cornerRadius: CGFloat) {
+        self.edgeWidth = edgeWidth
+        self.cornerRadius = cornerRadius
+        if #available(macOS 26.0, *), let glassView = materialView as? NSGlassEffectView {
+            glassView.tintColor = NSColor.white.withAlphaComponent(tint)
+        }
+        needsLayout = true
+    }
+
+    override func layout() {
+        super.layout()
+        materialView.frame = bounds
+        let ring = CGMutablePath()
+        ring.addPath(CGPath(
+            roundedRect: bounds,
+            cornerWidth: cornerRadius,
+            cornerHeight: cornerRadius,
+            transform: nil
+        ))
+        let inset = min(edgeWidth, min(bounds.width, bounds.height) / 2)
+        let innerBounds = bounds.insetBy(dx: inset, dy: inset)
+        ring.addPath(CGPath(
+            roundedRect: innerBounds,
+            cornerWidth: max(0, cornerRadius - inset),
+            cornerHeight: max(0, cornerRadius - inset),
+            transform: nil
+        ))
+        maskLayer.frame = bounds
+        maskLayer.path = ring
+        maskLayer.fillRule = .evenOdd
+        maskLayer.fillColor = NSColor.black.cgColor
     }
 }
 

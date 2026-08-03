@@ -27,6 +27,10 @@ final class AppSession {
     var musicScanProgress: MusicScanProgress?
     var currentArtworkData: Data?
     var isIslandEnabled: Bool
+    var glassTint: Double
+    var glassBlur: Double
+    var glassRefraction: Double
+    var glassMotionEnabled: Bool
     var lastMusicScan: Date? { musicLibrary.scanState.lastCompletedAt }
     var musicLibraryError: String?
     var musicLibraryNotice: String?
@@ -57,6 +61,10 @@ final class AppSession {
     init() {
         let islandPreference = UserDefaults.standard.object(forKey: "island.enabled") as? Bool
         isIslandEnabled = islandPreference ?? true
+        glassTint = UserDefaults.standard.object(forKey: "glass.tint") as? Double ?? 0.12
+        glassBlur = UserDefaults.standard.object(forKey: "glass.blur") as? Double ?? 4
+        glassRefraction = UserDefaults.standard.object(forKey: "glass.refraction") as? Double ?? 110
+        glassMotionEnabled = UserDefaults.standard.object(forKey: "glass.motion") as? Bool ?? true
         let clientID = Bundle.main.object(forInfoDictionaryKey: "LockTuneGoogleClientID") as? String ?? ""
         let clientSecret = Bundle.main.object(forInfoDictionaryKey: "LockTuneGoogleClientSecret") as? String ?? ""
         let oauthConfiguration = GoogleOAuthConfiguration(clientID: clientID, clientSecret: clientSecret)
@@ -530,6 +538,26 @@ final class AppSession {
     func setIslandEnabled(_ enabled: Bool) {
         isIslandEnabled = enabled
         UserDefaults.standard.set(enabled, forKey: "island.enabled")
+    }
+
+    func setGlassTint(_ value: Double) {
+        glassTint = value
+        UserDefaults.standard.set(value, forKey: "glass.tint")
+    }
+
+    func setGlassBlur(_ value: Double) {
+        glassBlur = value
+        UserDefaults.standard.set(value, forKey: "glass.blur")
+    }
+
+    func setGlassRefraction(_ value: Double) {
+        glassRefraction = value
+        UserDefaults.standard.set(value, forKey: "glass.refraction")
+    }
+
+    func setGlassMotionEnabled(_ enabled: Bool) {
+        glassMotionEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "glass.motion")
     }
 
     func resumeAfterWake() async {
