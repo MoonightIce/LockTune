@@ -32,7 +32,7 @@ final class IslandWindowController {
         panel.setAccessibilityLabel(String(localized: "island.accessibility"))
         let hostingView = NSHostingView(rootView: IslandView(session: session))
         hostingView.translatesAutoresizingMaskIntoConstraints = false
-        panel.contentView = IslandBackdropView(contentView: hostingView)
+        panel.contentView = IslandMaterialHostView(contentView: hostingView)
         self.panel = panel
         reposition()
         installObservers()
@@ -128,13 +128,47 @@ private final class IslandPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
-private final class IslandBackdropView: NSVisualEffectView {
+private final class IslandMaterialHostView: NSView {
     init(contentView: NSView) {
         super.init(frame: .zero)
 
-        // Use the live under-window material instead of the popover tint.
-        // The latter adds a stable gray surface, which masks the underlying
-        // window and makes the island look like an opaque card.
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.clear.cgColor
+
+        let materialView: NSView
+        if #available(macOS 26.0, *) {
+            let glassView = NSGlassEffectView()
+            glassView.contentView = contentView
+            glassView.cornerRadius = 999
+            glassView.style = .clear
+            glassView.tintColor = nil
+            materialView = glassView
+        } else {
+            materialView = IslandFallbackMaterialView(contentView: contentView)
+        }
+
+        materialView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(materialView)
+        NSLayoutConstraint.activate([
+            materialView.centerXAnchor.constraint(equalTo: centerXAnchor),
+            materialView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            materialView.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor),
+            materialView.heightAnchor.constraint(lessThanOrEqualTo: heightAnchor)
+        ])
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+}
+
+private final class IslandFallbackMaterialView: NSVisualEffectView {
+    init(contentView: NSView) {
+        super.init(frame: .zero)
+
+        // Older systems can sample the live window behind the island, but do
+        // not provide Liquid Glass lensing. Avoid a fixed popover tint so this
+        // remains an honest, transparent compatibility material.
         material = .underWindowBackground
         blendingMode = .behindWindow
         state = .active
