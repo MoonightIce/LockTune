@@ -30,7 +30,9 @@ final class IslandWindowController {
         panel.hidesOnDeactivate = false
         panel.isMovable = false
         panel.setAccessibilityLabel(String(localized: "island.accessibility"))
-        panel.contentView = NSHostingView(rootView: IslandView(session: session))
+        let hostingView = NSHostingView(rootView: IslandView(session: session))
+        hostingView.translatesAutoresizingMaskIntoConstraints = false
+        panel.contentView = IslandBackdropView(contentView: hostingView)
         self.panel = panel
         reposition()
         installObservers()
@@ -126,6 +128,33 @@ private final class IslandPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
+private final class IslandBackdropView: NSVisualEffectView {
+    init(contentView: NSView) {
+        super.init(frame: .zero)
+
+        material = .popover
+        blendingMode = .behindWindow
+        state = .active
+        isEmphasized = false
+        wantsLayer = true
+        layer?.cornerRadius = 32
+        layer?.cornerCurve = .continuous
+        layer?.masksToBounds = true
+
+        addSubview(contentView)
+        NSLayoutConstraint.activate([
+            contentView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            contentView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            contentView.topAnchor.constraint(equalTo: topAnchor),
+            contentView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+}
+
 private extension NSScreen {
     var displayID: CGDirectDisplayID? {
         deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
@@ -146,15 +175,7 @@ private struct IslandView: View {
     private let islandAnimation = Animation.spring(response: 0.38, dampingFraction: 0.84)
 
     var body: some View {
-        Group {
-            if #available(macOS 26.0, *) {
-                GlassEffectContainer(spacing: 12) {
-                    surfaceContent
-                }
-            } else {
-                surfaceContent
-            }
-        }
+        islandContent
         .scaleEffect(isHovered ? 1.012 : 1)
         .animation(reduceMotion ? nil : islandAnimation, value: geometry)
         .onHover { hovering in
@@ -164,23 +185,6 @@ private struct IslandView: View {
             .padding(4)
             .accessibilityElement(children: .contain)
             .accessibilityLabel("island.accessibility")
-    }
-
-    @ViewBuilder
-    private var surfaceContent: some View {
-        if #available(macOS 26.0, *) {
-            islandContent
-                .glassEffect(.clear, in: RoundedRectangle(
-                    cornerRadius: geometry.cornerRadius,
-                    style: .continuous
-                ))
-        } else {
-            islandContent
-                .background(.ultraThinMaterial, in: RoundedRectangle(
-                    cornerRadius: geometry.cornerRadius,
-                    style: .continuous
-                ))
-        }
     }
 
     private var islandContent: some View {
