@@ -41,7 +41,7 @@ func systemNowPlayingInfoClearsWithoutCurrentItem() {
 
 @MainActor
 @Test("System Now Playing clears stale state and follows queue command semantics")
-func systemNowPlayingCenterClearsStaleStateAndFollowsQueueSemantics() {
+func systemNowPlayingCenterClearsStaleStateAndFollowsQueueSemantics() async {
     let item = PlaybackItem(
         trackID: UUID(),
         locationID: "stale-location",
@@ -65,6 +65,7 @@ func systemNowPlayingCenterClearsStaleStateAndFollowsQueueSemantics() {
     infoCenter.playbackState = .playing
 
     center.update(snapshot, artworkData: nil)
+    await Task.yield()
 
     #expect(infoCenter.nowPlayingInfo == nil)
     #expect(infoCenter.playbackState == .stopped)
@@ -82,6 +83,7 @@ func systemNowPlayingCenterClearsStaleStateAndFollowsQueueSemantics() {
         canAdvance: false
     )
     center.update(loadingSnapshot, artworkData: nil)
+    await Task.yield()
     #expect(commandCenter.playCommand.isEnabled == false)
     #expect(commandCenter.pauseCommand.isEnabled == false)
 
@@ -94,6 +96,7 @@ func systemNowPlayingCenterClearsStaleStateAndFollowsQueueSemantics() {
         canAdvance: true
     )
     center.update(loopingSnapshot, artworkData: nil)
+    await Task.yield()
     #expect(commandCenter.nextTrackCommand.isEnabled)
 
     let secondItem = PlaybackItem(
@@ -111,6 +114,7 @@ func systemNowPlayingCenterClearsStaleStateAndFollowsQueueSemantics() {
         canAdvance: true
     )
     center.update(shuffledSnapshot, artworkData: nil)
+    await Task.yield()
     #expect(commandCenter.nextTrackCommand.isEnabled)
 
     infoCenter.nowPlayingInfo = nil

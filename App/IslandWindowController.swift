@@ -132,7 +132,10 @@ private final class IslandBackdropView: NSVisualEffectView {
     init(contentView: NSView) {
         super.init(frame: .zero)
 
-        material = .popover
+        // Use the live under-window material instead of the popover tint.
+        // The latter adds a stable gray surface, which masks the underlying
+        // window and makes the island look like an opaque card.
+        material = .underWindowBackground
         blendingMode = .behindWindow
         state = .active
         isEmphasized = false

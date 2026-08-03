@@ -34,6 +34,9 @@ public final class SystemNowPlayingCenter {
     private let infoCenter: MPNowPlayingInfoCenter
     private let commandStream: AsyncStream<SystemPlaybackCommand>
     private let commandContinuation: AsyncStream<SystemPlaybackCommand>.Continuation
+    private var appliedCommandAvailability: CommandAvailability?
+    private var pendingCommandAvailability: CommandAvailability?
+    private var commandAvailabilityTask: Task<Void, Never>?
 
     public init(
         commandCenter: MPRemoteCommandCenter = .shared(),
@@ -55,7 +58,7 @@ public final class SystemNowPlayingCenter {
         guard var info = makeSystemNowPlayingInfo(from: snapshot) else {
             infoCenter.nowPlayingInfo = nil
             infoCenter.playbackState = .stopped
-            updateCommandAvailability(hasItem: false, snapshot: snapshot)
+            scheduleCommandAvailability(hasItem: false, snapshot: snapshot)
             return
         }
 
@@ -69,7 +72,7 @@ public final class SystemNowPlayingCenter {
         case .paused, .loading: infoCenter.playbackState = .paused
         case .idle, .failed: infoCenter.playbackState = .stopped
         }
-        updateCommandAvailability(hasItem: true, snapshot: snapshot)
+        scheduleCommandAvailability(hasItem: true, snapshot: snapshot)
     }
 
     private func configureCommands() {
@@ -96,15 +99,56 @@ public final class SystemNowPlayingCenter {
             commandContinuation.yield(.seek(event.positionTime))
             return .success
         }
-        updateCommandAvailability(hasItem: false, snapshot: PlaybackSnapshot())
+        applyCommandAvailability(.none)
     }
 
-    private func updateCommandAvailability(hasItem: Bool, snapshot: PlaybackSnapshot) {
-        commandCenter.playCommand.isEnabled = hasItem
-            && (snapshot.phase == .paused || snapshot.phase == .idle)
-        commandCenter.pauseCommand.isEnabled = hasItem && snapshot.phase == .playing
-        commandCenter.nextTrackCommand.isEnabled = hasItem && snapshot.canAdvance == true
-        commandCenter.previousTrackCommand.isEnabled = hasItem
-        commandCenter.changePlaybackPositionCommand.isEnabled = hasItem && snapshot.duration != nil
+    private func scheduleCommandAvailability(hasItem: Bool, snapshot: PlaybackSnapshot) {
+        let availability = CommandAvailability(
+            play: hasItem && (snapshot.phase == .paused || snapshot.phase == .idle),
+            pause: hasItem && snapshot.phase == .playing,
+            next: hasItem && snapshot.canAdvance == true,
+            previous: hasItem,
+            seek: hasItem && snapshot.duration != nil
+        )
+
+        guard availability != appliedCommandAvailability,
+              availability != pendingCommandAvailability
+        else { return }
+
+        pendingCommandAvailability = availability
+        guard commandAvailabilityTask == nil else { return }
+
+        commandAvailabilityTask = Task { @MainActor [weak self] in
+            // Let MPNowPlayingInfoCenter finish ingesting the current snapshot
+            // (including any artwork provider callback) before mutating the
+            // remote-command state. MediaPlayer can trap when both operations
+            // happen in the same turn.
+            await Task.yield()
+            guard let self else { return }
+            let next = self.pendingCommandAvailability ?? .none
+            self.pendingCommandAvailability = nil
+            self.commandAvailabilityTask = nil
+            self.applyCommandAvailability(next)
+        }
     }
+
+    private func applyCommandAvailability(_ availability: CommandAvailability) {
+        guard availability != appliedCommandAvailability else { return }
+        appliedCommandAvailability = availability
+        commandCenter.playCommand.isEnabled = availability.play
+        commandCenter.pauseCommand.isEnabled = availability.pause
+        commandCenter.nextTrackCommand.isEnabled = availability.next
+        commandCenter.previousTrackCommand.isEnabled = availability.previous
+        commandCenter.changePlaybackPositionCommand.isEnabled = availability.seek
+    }
+}
+
+private struct CommandAvailability: Equatable, Sendable {
+    let play: Bool
+    let pause: Bool
+    let next: Bool
+    let previous: Bool
+    let seek: Bool
+
+    static let none = Self(play: false, pause: false, next: false, previous: false, seek: false)
 }
