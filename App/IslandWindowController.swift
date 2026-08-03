@@ -158,8 +158,12 @@ private struct IslandView: View {
         }
         .padding(.horizontal, 15)
         .frame(width: 380, height: 64)
-        .foregroundStyle(.white)
-        .background(.black.opacity(0.94), in: Capsule())
+        .foregroundStyle(.primary)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(Color.white.opacity(0.55), lineWidth: 0.75)
+        }
         .padding(4)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("island.accessibility")
