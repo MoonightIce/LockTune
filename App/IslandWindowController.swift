@@ -151,25 +151,11 @@ private struct IslandView: View {
     @ViewBuilder
     private var surfaceContent: some View {
         if #available(macOS 26.0, *) {
-            ZStack {
-                    Color.clear
-                        .frame(width: 392, height: 76)
-                        .glassEffect(.clear, in: Rectangle())
-                    .opacity(0.1)
-                islandContent
-            }
-            .frame(width: 380, height: 64)
-            .mask(Capsule().fill(.white).blur(radius: 1.25))
+            islandContent
+                .glassEffect(.clear, in: Capsule())
         } else {
-            ZStack {
-                    Color.clear
-                        .frame(width: 392, height: 76)
-                        .background(.ultraThinMaterial, in: Rectangle())
-                    .opacity(0.1)
-                islandContent
-            }
-            .frame(width: 380, height: 64)
-            .mask(Capsule().fill(.white).blur(radius: 1.25))
+            islandContent
+                .background(.ultraThinMaterial, in: Capsule())
         }
     }
 
