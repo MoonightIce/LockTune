@@ -121,6 +121,28 @@ private struct IslandView: View {
     @Bindable var session: AppSession
 
     var body: some View {
+        surfaceContent
+            .padding(4)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("island.accessibility")
+    }
+
+    @ViewBuilder
+    private var surfaceContent: some View {
+        if #available(macOS 26.0, *) {
+            islandContent
+                .glassEffect(.clear, in: Capsule())
+        } else {
+            islandContent
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay {
+                    Capsule()
+                        .stroke(Color.white.opacity(0.55), lineWidth: 0.75)
+                }
+        }
+    }
+
+    private var islandContent: some View {
         HStack(spacing: 12) {
             icon
                 .font(.title3)
@@ -159,14 +181,6 @@ private struct IslandView: View {
         .padding(.horizontal, 15)
         .frame(width: 380, height: 64)
         .foregroundStyle(.primary)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay {
-            Capsule()
-                .stroke(Color.white.opacity(0.55), lineWidth: 0.75)
-        }
-        .padding(4)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("island.accessibility")
     }
 
     private var presentation: IslandPresentation { session.islandPresentation }
