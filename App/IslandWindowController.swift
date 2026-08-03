@@ -140,9 +140,27 @@ private extension NSScreen {
 
 private struct IslandView: View {
     @Bindable var session: AppSession
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isHovered = false
+
+    private let islandAnimation = Animation.spring(response: 0.38, dampingFraction: 0.84)
 
     var body: some View {
-        surfaceContent
+        Group {
+            if #available(macOS 26.0, *) {
+                GlassEffectContainer(spacing: 12) {
+                    surfaceContent
+                }
+            } else {
+                surfaceContent
+            }
+        }
+        .scaleEffect(isHovered ? 1.012 : 1)
+        .animation(reduceMotion ? nil : islandAnimation, value: geometry)
+        .onHover { hovering in
+            guard !reduceMotion else { return }
+            isHovered = hovering
+        }
             .padding(4)
             .accessibilityElement(children: .contain)
             .accessibilityLabel("island.accessibility")
@@ -152,10 +170,16 @@ private struct IslandView: View {
     private var surfaceContent: some View {
         if #available(macOS 26.0, *) {
             islandContent
-                .glassEffect(.clear, in: Capsule())
+                .glassEffect(.clear, in: RoundedRectangle(
+                    cornerRadius: geometry.cornerRadius,
+                    style: .continuous
+                ))
         } else {
             islandContent
-                .background(.ultraThinMaterial, in: Capsule())
+                .background(.ultraThinMaterial, in: RoundedRectangle(
+                    cornerRadius: geometry.cornerRadius,
+                    style: .continuous
+                ))
         }
     }
 
@@ -196,11 +220,22 @@ private struct IslandView: View {
             }
         }
         .padding(.horizontal, 15)
-        .frame(width: 380, height: 64)
+        .frame(width: geometry.width, height: geometry.height)
         .foregroundStyle(.primary)
     }
 
     private var presentation: IslandPresentation { session.islandPresentation }
+
+    private var geometry: IslandGeometry {
+        switch presentation {
+        case .idle:
+            IslandGeometry(width: 188, height: 48, cornerRadius: 24)
+        case .music:
+            IslandGeometry(width: 308, height: 56, cornerRadius: 28)
+        case .meeting:
+            IslandGeometry(width: 380, height: 64, cornerRadius: 32)
+        }
+    }
 
     @ViewBuilder
     private var icon: some View {
@@ -232,4 +267,10 @@ private struct IslandView: View {
             return String(localized: "island.idle")
         }
     }
+}
+
+private struct IslandGeometry: Equatable {
+    let width: CGFloat
+    let height: CGFloat
+    let cornerRadius: CGFloat
 }
