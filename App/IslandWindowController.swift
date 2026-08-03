@@ -25,7 +25,7 @@ final class IslandWindowController {
         panel.title = "LockTune Island"
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = true
+        panel.hasShadow = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         panel.hidesOnDeactivate = false
         panel.isMovable = false
@@ -153,23 +153,23 @@ private struct IslandView: View {
         if #available(macOS 26.0, *) {
             ZStack {
                     Color.clear
-                        .frame(width: 380, height: 64)
-                        .glassEffect(.clear, in: Capsule())
-                    .opacity(0.4)
+                        .frame(width: 392, height: 76)
+                        .glassEffect(.clear, in: Rectangle())
+                    .opacity(0.1)
                 islandContent
             }
+            .frame(width: 380, height: 64)
+            .mask(Capsule().fill(.white).blur(radius: 1.25))
         } else {
             ZStack {
                     Color.clear
-                        .frame(width: 380, height: 64)
-                        .background(.ultraThinMaterial, in: Capsule())
-                    .opacity(0.4)
-                    .overlay {
-                        Capsule()
-                            .stroke(Color.white.opacity(0.55), lineWidth: 0.75)
-                    }
+                        .frame(width: 392, height: 76)
+                        .background(.ultraThinMaterial, in: Rectangle())
+                    .opacity(0.1)
                 islandContent
             }
+            .frame(width: 380, height: 64)
+            .mask(Capsule().fill(.white).blur(radius: 1.25))
         }
     }
 
