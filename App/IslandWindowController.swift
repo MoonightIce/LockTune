@@ -152,18 +152,18 @@ private struct IslandView: View {
     private var surfaceContent: some View {
         if #available(macOS 26.0, *) {
             ZStack {
-                Color.clear
-                    .frame(width: 380, height: 64)
-                    .glassEffect(.clear, in: Capsule())
-                    .opacity(0.72)
+                    Color.clear
+                        .frame(width: 380, height: 64)
+                        .glassEffect(.clear, in: Capsule())
+                    .opacity(0.4)
                 islandContent
             }
         } else {
             ZStack {
-                Color.clear
-                    .frame(width: 380, height: 64)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .opacity(0.72)
+                    Color.clear
+                        .frame(width: 380, height: 64)
+                        .background(.ultraThinMaterial, in: Capsule())
+                    .opacity(0.4)
                     .overlay {
                         Capsule()
                             .stroke(Color.white.opacity(0.55), lineWidth: 0.75)
