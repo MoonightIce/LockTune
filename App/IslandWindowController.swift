@@ -9,6 +9,7 @@ final class IslandWindowController {
     private var observers: [NSObjectProtocol] = []
     private var isSessionActive = true
     private var isEnabled = true
+    private var displayedScreenID: CGDirectDisplayID?
     private let visibilityPolicy = IslandCoordinator()
 
     func show(session: AppSession) {
@@ -51,6 +52,7 @@ final class IslandWindowController {
         observers.removeAll()
         panel?.close()
         panel = nil
+        displayedScreenID = nil
     }
 
     private func installObservers() {
@@ -92,7 +94,22 @@ final class IslandWindowController {
             ? screen.frame.maxY - screen.safeAreaInsets.top
             : screen.visibleFrame.maxY
         let y = availableTop - panel.frame.height - 4
-        panel.setFrameOrigin(NSPoint(x: x.rounded(), y: y.rounded()))
+        let frame = NSRect(
+            x: x.rounded(),
+            y: y.rounded(),
+            width: panel.frame.width,
+            height: panel.frame.height
+        )
+        let screenID = screen.displayID
+        guard panel.frame != frame || displayedScreenID != screenID else { return }
+
+        // Move the independent status-bar panel without animating or carrying
+        // the previous display's glass snapshot into the new screen.
+        panel.orderOut(nil)
+        panel.setFrame(frame, display: false)
+        panel.displayIfNeeded()
+        panel.orderFrontRegardless()
+        displayedScreenID = screenID
     }
 
     private var targetScreen: NSScreen? {
@@ -110,8 +127,12 @@ private final class IslandPanel: NSPanel {
 }
 
 private extension NSScreen {
+    var displayID: CGDirectDisplayID? {
+        deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
+    }
+
     var isBuiltin: Bool {
-        guard let screenNumber = deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
+        guard let screenNumber = displayID
         else { return false }
         return CGDisplayIsBuiltin(screenNumber) != 0
     }
@@ -130,15 +151,25 @@ private struct IslandView: View {
     @ViewBuilder
     private var surfaceContent: some View {
         if #available(macOS 26.0, *) {
-            islandContent
-                .glassEffect(.clear, in: Capsule())
+            ZStack {
+                Color.clear
+                    .frame(width: 380, height: 64)
+                    .glassEffect(.clear, in: Capsule())
+                    .opacity(0.72)
+                islandContent
+            }
         } else {
-            islandContent
-                .background(.ultraThinMaterial, in: Capsule())
-                .overlay {
-                    Capsule()
-                        .stroke(Color.white.opacity(0.55), lineWidth: 0.75)
-                }
+            ZStack {
+                Color.clear
+                    .frame(width: 380, height: 64)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .opacity(0.72)
+                    .overlay {
+                        Capsule()
+                            .stroke(Color.white.opacity(0.55), lineWidth: 0.75)
+                    }
+                islandContent
+            }
         }
     }
 
