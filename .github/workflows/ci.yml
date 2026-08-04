@@ -16,20 +16,10 @@ jobs:
         run: swift test
 
       - name: Build Universal macOS app
-        run: >
-          xcodebuild
-          -project LockTune.xcodeproj
-          -scheme LockTune
-          -configuration Release
-          -destination 'generic/platform=macOS'
-          -derivedDataPath "$RUNNER_TEMP/LockTuneDerivedData"
-          CODE_SIGNING_ALLOWED=NO
-          ARCHS='arm64 x86_64'
-          ONLY_ACTIVE_ARCH=NO
-          build
+        run: scripts/build-app.sh Release 'ARCHS=arm64 x86_64' ONLY_ACTIVE_ARCH=NO
 
       - name: Verify Universal architectures
         run: |
-          binary="$RUNNER_TEMP/LockTuneDerivedData/Build/Products/Release/LockTune.app/Contents/MacOS/LockTune"
+          binary="$GITHUB_WORKSPACE/.build/XcodeDerivedData/Build/Products/Release/LockTune.app/Contents/MacOS/LockTune"
           architectures="$(lipo -archs "$binary")"
           [[ "$architectures" == *arm64* && "$architectures" == *x86_64* ]]
