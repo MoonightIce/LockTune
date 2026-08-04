@@ -8,7 +8,14 @@ actual_directory="${TARGET_BUILD_DIR:A}"
 
 if [[ "$actual_directory" != "$expected_directory" ]]; then
     unexpected_product="$actual_directory/$FULL_PRODUCT_NAME"
-    if [[ "$unexpected_product" == */Build/Products/*/*.app && -d "$unexpected_product" ]]; then
+    case "$FULL_PRODUCT_NAME" in
+        "LockTune.app"|"LockTune Debug.app") ;;
+        *)
+            print -u2 "error: Refusing to clean unexpected product name: $FULL_PRODUCT_NAME"
+            exit 1
+            ;;
+    esac
+    if [[ "$actual_directory" == /* && "$actual_directory" != / && -d "$unexpected_product" ]]; then
         /bin/rm -rf -- "$unexpected_product"
     fi
     print -u2 "error: LockTune app builds must use $expected_directory"
