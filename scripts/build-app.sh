@@ -16,6 +16,15 @@ case "$configuration" in
         ;;
 esac
 
+for argument in "$@"; do
+    case "$argument" in
+        -derivedDataPath|-derivedDataPath=*|BUILD_DIR=*|CONFIGURATION_BUILD_DIR=*|SYMROOT=*|TARGET_BUILD_DIR=*)
+            print -u2 "Build location overrides are not allowed; LockTune uses .build/XcodeDerivedData."
+            exit 64
+            ;;
+    esac
+done
+
 exec xcodebuild \
     -project "$repo_root/LockTune.xcodeproj" \
     -scheme LockTune \

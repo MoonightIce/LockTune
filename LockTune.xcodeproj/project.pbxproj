@@ -88,6 +88,7 @@
             isa = PBXNativeTarget;
             buildConfigurationList = A90000000000000000000002 /* Build configuration list for PBXNativeTarget "LockTune" */;
             buildPhases = (
+                AD0000000000000000000001 /* Verify Canonical Build Location */,
                 A60000000000000000000001 /* Sources */,
                 A30000000000000000000001 /* Frameworks */,
                 A70000000000000000000001 /* Resources */,
@@ -155,6 +156,28 @@
             runOnlyForDeploymentPostprocessing = 0;
         };
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+        AD0000000000000000000001 /* Verify Canonical Build Location */ = {
+            isa = PBXShellScriptBuildPhase;
+            alwaysOutOfDate = 1;
+            buildActionMask = 2147483647;
+            files = (
+            );
+            inputFileListPaths = (
+            );
+            inputPaths = (
+            );
+            name = "Verify Canonical Build Location";
+            outputFileListPaths = (
+            );
+            outputPaths = (
+            );
+            runOnlyForDeploymentPostprocessing = 0;
+            shellPath = /bin/zsh;
+            shellScript = "\"$SRCROOT/scripts/verify-build-location.sh\"\n";
+        };
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
         A60000000000000000000001 /* Sources */ = {

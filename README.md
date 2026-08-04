@@ -49,9 +49,10 @@ Build the application without distribution signing:
 All local Xcode builds write their application product to one canonical location:
 `.build/XcodeDerivedData/Build/Products/<Configuration>`. Debug builds are named
 `LockTune Debug.app` and use `app.locktune.macos.debug`; Release builds remain
-`LockTune.app` with `app.locktune.macos`. Use the script instead of introducing
-additional DerivedData paths. This prevents macOS from reusing a stale build that
-has the same application identity.
+`LockTune.app` with `app.locktune.macos`. A build-phase guard rejects Xcode or
+command-line builds that target any other DerivedData location, and the script
+rejects build-location overrides. This prevents macOS from reusing a stale build
+that has the same application identity.
 
 Google Calendar setup for release and contributor builds is documented in
 `docs/google-oauth.md`.
