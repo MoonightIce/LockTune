@@ -685,10 +685,22 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "背景模糊" } }
       }
     },
+    "settings.glassBacking" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Frosted backing" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "毛玻璃底板" } }
+      }
+    },
+    "settings.glassBackingRequiresMacOS26" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The five-level backing control is available with native Liquid Glass on macOS 26." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "五档毛玻璃底板随 macOS 26 原生 Liquid Glass 提供。" } }
+      }
+    },
     "settings.glassBoundaryNote" : {
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Refraction is limited to the view border; content stays clear." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "折射只作用于视图边框，主体内容保持清晰。" } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "macOS 26 uses the experimental NSGlassEffectView refraction path. Refraction maps to lensing levels 0–6, with the frosted backing below it. This path uses undocumented SPI and is not App Store compatible." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "macOS 26 使用 NSGlassEffectView 实验性折射路径；折射强度映射为 0–6 档，毛玻璃底板位于其下。此路径使用未公开 SPI，不适用于 App Store 发布。" } }
       }
     },
     "settings.glassContentClear" : {
@@ -699,8 +711,8 @@
     },
     "settings.glassLaboratory" : {
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "CSS laboratory" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "CSS laboratory" } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Laboratory" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Laboratory" } }
       }
     },
     "settings.glassMotion" : {
@@ -709,10 +721,52 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "背景实时移动" } }
       }
     },
+    "settings.glassPrivateRefraction" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Enable private refraction experiment" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "启用私有折射实验" } }
+      }
+    },
     "settings.glassRefraction" : {
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Edge refraction" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "边缘折射" } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Refraction strength" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "折射强度" } }
+      }
+    },
+    "settings.glassRuntimeComplete" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Complete private refraction" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "完整私有折射" } }
+      }
+    },
+    "settings.glassRuntimeLegacyFallback" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Legacy visual-effect fallback" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "旧版视觉效果降级" } }
+      }
+    },
+    "settings.glassRuntimeNotEvaluated" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Runtime not evaluated" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "尚未评估运行时能力" } }
+      }
+    },
+    "settings.glassRuntimeOpaqueFallback" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Opaque accessibility fallback" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "不透明辅助功能降级" } }
+      }
+    },
+    "settings.glassRuntimePublicFallback" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Public glass fallback (not full refraction)" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "公开玻璃降级（不满足完整折射）" } }
+      }
+    },
+    "settings.glassTokenClockPreset" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "TokenClock preset" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "TokenClock 预设" } }
       }
     },
     "settings.glassTint" : {

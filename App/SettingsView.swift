@@ -161,10 +161,16 @@ struct SettingsView: View {
 
 private struct GlassLaboratoryView: View {
     @Bindable var session: AppSession
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            GlassLabPreview(session: session)
+            GlassLabPreview(
+                session: session,
+                reduceMotion: reduceMotion,
+                reduceTransparency: reduceTransparency
+            )
                 .frame(height: 86)
                 .padding(.bottom, 6)
             glassSlider(
@@ -174,19 +180,59 @@ private struct GlassLaboratoryView: View {
                 step: 0.01,
                 valueLabel: { String(format: "%.2f", $0) }
             )
-            glassSlider(
-                title: "settings.glassBlur",
-                value: Binding(get: { session.glassBlur }, set: { session.setGlassBlur($0) }),
-                range: 0...36,
-                step: 1,
-                valueLabel: { "\(Int($0)) px" }
-            )
+            if #available(macOS 26.0, *) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("settings.glassBacking")
+                        Spacer()
+                        Text("\(session.glassBackingLevel.rawValue)%")
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                    Picker(
+                        "settings.glassBacking",
+                        selection: Binding(
+                            get: { session.glassBackingLevel },
+                            set: { session.setGlassBackingLevel($0) }
+                        )
+                    ) {
+                        ForEach(GlassBackingLevel.allCases) { level in
+                            Text("\(level.rawValue)%").tag(level)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                }
+            } else {
+                Text("settings.glassBackingRequiresMacOS26")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             glassSlider(
                 title: "settings.glassRefraction",
                 value: Binding(get: { session.glassRefraction }, set: { session.setGlassRefraction($0) }),
-                range: 0...160,
+                range: 0...6,
                 step: 1,
                 valueLabel: { "\(Int($0))" }
+            )
+            HStack {
+                Button("settings.glassTokenClockPreset") {
+                    session.setGlassTint(0)
+                    session.setGlassBackingLevel(.clear)
+                    session.setGlassRefraction(Double(LiquidGlassConfiguration.dockLensing))
+                }
+                .buttonStyle(.bordered)
+                Spacer()
+                Text(runtimeLabel)
+                    .font(.caption)
+                    .foregroundStyle(session.liquidGlassRuntimeMode == .completePrivateRefraction ? .green : .secondary)
+            }
+            Toggle(
+                "settings.glassPrivateRefraction",
+                isOn: Binding(
+                    get: { session.privateRefractionEnabled },
+                    set: { session.setPrivateRefractionEnabled($0) }
+                )
             )
             Toggle(
                 "settings.glassMotion",
@@ -195,6 +241,16 @@ private struct GlassLaboratoryView: View {
                     set: { session.setGlassMotionEnabled($0) }
                 )
             )
+        }
+    }
+
+    private var runtimeLabel: LocalizedStringKey {
+        switch session.liquidGlassRuntimeMode {
+        case .completePrivateRefraction: "settings.glassRuntimeComplete"
+        case .publicGlassFallback: "settings.glassRuntimePublicFallback"
+        case .legacyVisualEffectFallback: "settings.glassRuntimeLegacyFallback"
+        case .opaqueAccessibilityFallback: "settings.glassRuntimeOpaqueFallback"
+        case .notEvaluated: "settings.glassRuntimeNotEvaluated"
         }
     }
 
@@ -220,34 +276,32 @@ private struct GlassLaboratoryView: View {
 
 private struct GlassLabPreview: View {
     @Bindable var session: AppSession
+    let reduceMotion: Bool
+    let reduceTransparency: Bool
 
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [.blue.opacity(0.72), .purple.opacity(0.55), .orange.opacity(0.65)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .clipShape(Capsule())
-            Color.white.opacity(session.glassTint)
-                .clipShape(Capsule())
-            GlassEdgeMaterial(session: session, cornerRadius: 43)
-                .clipShape(Capsule())
+        LiquidGlassSurfaceContainer(
+            session: session,
+            cornerRadius: 43,
+            backdropSource: .withinWindow,
+            reduceMotion: reduceMotion,
+            reduceTransparency: reduceTransparency
+        ) {
             HStack(spacing: 10) {
                 Image(systemName: "waveform")
                     .frame(width: 30, height: 30)
-                    .background(.white.opacity(0.14), in: Circle())
+                    .background(.primary.opacity(0.1), in: Circle())
                 VStack(alignment: .leading, spacing: 2) {
                     Text("settings.glassLaboratory").font(.headline)
                     Text("settings.glassContentClear")
                         .font(.caption)
-                        .foregroundStyle(.white.opacity(0.72))
+                        .foregroundStyle(.secondary)
                 }
                 Spacer()
                 Image(systemName: "sparkles")
-                    .foregroundStyle(.white.opacity(0.82))
+                    .foregroundStyle(.secondary)
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(.primary)
             .padding(.horizontal, 16)
         }
         .shadow(color: .black.opacity(0.18), radius: 16, y: 8)
