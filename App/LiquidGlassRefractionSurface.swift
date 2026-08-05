@@ -38,6 +38,29 @@ struct LiquidGlassActiveAppearanceCapabilities: Equatable, Sendable {
     var allSelectorsInstalled: Bool { selectorsInstalled.values.allSatisfy { $0 } }
 }
 
+enum LiquidGlassDebugFixture {
+    #if DEBUG
+    static var enabled: Bool {
+        ProcessInfo.processInfo.arguments.contains("--locktune-glass-fixture")
+    }
+
+    static var noGlass: Bool {
+        enabled && ProcessInfo.processInfo.arguments.contains("--locktune-glass-no-glass")
+    }
+
+    static var lensingOverride: Double? {
+        guard enabled else { return nil }
+        let prefix = "--locktune-glass-lensing="
+        guard let argument = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix(prefix) }) else { return nil }
+        return Double(argument.dropFirst(prefix.count)).map { min(max($0.rounded(), 0), 6) }
+    }
+    #else
+    static let enabled = false
+    static let noGlass = false
+    static let lensingOverride: Double? = nil
+    #endif
+}
+
 @MainActor
 enum LiquidGlassRuntimeAdapter {
     private static var didReportCapabilities = false
@@ -282,16 +305,19 @@ final class LiquidGlassSurfaceHost: NSView {
     private var configuration: LiquidGlassConfiguration
     private let backdropSource: LiquidGlassBackdropSource
     private var cornerRadius: CGFloat
+    private var fixtureNoGlass: Bool
 
     init(
         configuration: LiquidGlassConfiguration,
         backdropSource: LiquidGlassBackdropSource = .behindWindow,
         cornerRadius: CGFloat = 30,
+        fixtureNoGlass: Bool = false,
         contentView: NSView? = nil
     ) {
         self.configuration = configuration
         self.backdropSource = backdropSource
         self.cornerRadius = cornerRadius
+        self.fixtureNoGlass = fixtureNoGlass
         super.init(frame: .zero)
         wantsLayer = true
         layer?.masksToBounds = true
@@ -310,9 +336,14 @@ final class LiquidGlassSurfaceHost: NSView {
         needsLayout = true
     }
 
-    func update(configuration: LiquidGlassConfiguration, cornerRadius: CGFloat? = nil) {
+    func update(
+        configuration: LiquidGlassConfiguration,
+        cornerRadius: CGFloat? = nil,
+        fixtureNoGlass: Bool? = nil
+    ) {
         self.configuration = configuration
         if let cornerRadius { self.cornerRadius = cornerRadius }
+        if let fixtureNoGlass { self.fixtureNoGlass = fixtureNoGlass }
         layer?.cornerRadius = max(0, self.cornerRadius)
         layer?.cornerCurve = .continuous
         layer?.masksToBounds = true
@@ -334,6 +365,10 @@ final class LiquidGlassSurfaceHost: NSView {
             backingView.alphaValue = 1
             backingView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
             runtimeMode = .opaqueAccessibilityFallback
+            capabilities = LiquidGlassCapabilities(runtimeMode: runtimeMode)
+        } else if fixtureNoGlass == true {
+            replaceGlassView(nil)
+            runtimeMode = .publicGlassFallback
             capabilities = LiquidGlassCapabilities(runtimeMode: runtimeMode)
         } else {
             backingView.layer?.backgroundColor = nil
@@ -400,11 +435,12 @@ struct LiquidGlassSurfaceContainer<Content: View>: NSViewRepresentable {
     let content: () -> Content
 
     private var configuration: LiquidGlassConfiguration {
-        LiquidGlassConfiguration(
-            tint: session.glassTint,
-            backingLevel: session.glassBackingLevel,
-            lensing: session.glassRefraction,
-            dynamicAurora: session.glassMotionEnabled,
+        let fixture = fixtureEnabled || LiquidGlassDebugFixture.enabled
+        return LiquidGlassConfiguration(
+            tint: fixture ? 0 : session.glassTint,
+            backingLevel: fixture ? .clear : session.glassBackingLevel,
+            lensing: fixture ? (LiquidGlassDebugFixture.lensingOverride ?? session.glassRefraction) : session.glassRefraction,
+            dynamicAurora: fixture ? false : session.glassMotionEnabled,
             reduceMotion: reduceMotion,
             reduceTransparency: reduceTransparency,
             privateRefractionEnabled: session.privateRefractionEnabled
@@ -417,16 +453,21 @@ struct LiquidGlassSurfaceContainer<Content: View>: NSViewRepresentable {
             configuration: configuration,
             backdropSource: backdropSource,
             cornerRadius: cornerRadius,
+            fixtureNoGlass: fixtureEnabled || LiquidGlassDebugFixture.noGlass,
             contentView: contentView
         )
-        host.auroraView.fixtureEnabled = fixtureEnabled
+        host.auroraView.fixtureEnabled = fixtureEnabled || LiquidGlassDebugFixture.enabled
         session.setLiquidGlassRuntimeMode(host.runtimeMode)
         return host
     }
 
     func updateNSView(_ host: LiquidGlassSurfaceHost, context: Context) {
-        host.update(configuration: configuration, cornerRadius: cornerRadius)
-        host.auroraView.fixtureEnabled = fixtureEnabled
+        host.update(
+            configuration: configuration,
+            cornerRadius: cornerRadius,
+            fixtureNoGlass: fixtureEnabled || LiquidGlassDebugFixture.noGlass
+        )
+        host.auroraView.fixtureEnabled = fixtureEnabled || LiquidGlassDebugFixture.enabled
         if let contentView = host.hostedContentView as? NSHostingView<Content> {
             contentView.rootView = content()
         }

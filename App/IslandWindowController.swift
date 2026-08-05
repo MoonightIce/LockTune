@@ -208,7 +208,8 @@ private struct IslandView: View {
             cornerRadius: CGFloat(geometry.cornerRadius),
             backdropSource: .behindWindow,
             reduceMotion: reduceMotion,
-            reduceTransparency: reduceTransparency
+            reduceTransparency: reduceTransparency,
+            fixtureEnabled: LiquidGlassDebugFixture.enabled
         ) {
             VStack(spacing: 0) {
                 if session.islandAttachment == .notchAttached {
