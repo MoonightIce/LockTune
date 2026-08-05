@@ -435,7 +435,7 @@ struct LiquidGlassSurfaceContainer<Content: View>: NSViewRepresentable {
             activeAppearanceOverrideAvailable: activeAppearanceOverrideAvailable,
             contentView: contentView
         )
-        session.setLiquidGlassRuntimeMode(host.runtimeMode)
+        publishRuntimeMode(host.runtimeMode)
         return host
     }
 
@@ -449,7 +449,15 @@ struct LiquidGlassSurfaceContainer<Content: View>: NSViewRepresentable {
         if let contentView = host.hostedContentView as? NSHostingView<Content> {
             contentView.rootView = content()
         }
-        session.setLiquidGlassRuntimeMode(host.runtimeMode)
+        publishRuntimeMode(host.runtimeMode)
+    }
+
+    private func publishRuntimeMode(_ mode: LiquidGlassRuntimeMode) {
+        guard session.liquidGlassRuntimeMode != mode else { return }
+        let session = session
+        Task { @MainActor in
+            session.setLiquidGlassRuntimeMode(mode)
+        }
     }
 }
 
