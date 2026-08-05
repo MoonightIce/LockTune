@@ -1,4 +1,5 @@
 import SwiftUI
+import LockTuneDomain
 
 struct SettingsView: View {
     @Bindable var session: AppSession
