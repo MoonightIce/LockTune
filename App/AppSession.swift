@@ -37,6 +37,9 @@ final class AppSession {
     var availableIslandDisplays: [IslandDisplay] = []
     var islandAttachment: IslandAttachment = .floatingCapsule
     var islandHardwareNotchWidth: Double = 0
+    /// Transient capability reported after the Island panel installs its
+    /// five active-appearance overrides; this is never persisted.
+    var islandActiveAppearanceOverrideAvailable = false
     var lastMusicScan: Date? { musicLibrary.scanState.lastCompletedAt }
     var musicLibraryError: String?
     var musicLibraryNotice: String?
@@ -586,6 +589,10 @@ final class AppSession {
         availableIslandDisplays = displays
         islandAttachment = attachment
         islandHardwareNotchWidth = hardwareNotchWidth
+    }
+
+    func setIslandActiveAppearanceOverrideAvailable(_ available: Bool) {
+        islandActiveAppearanceOverrideAvailable = available
     }
 
     func setGlassTint(_ value: Double) {

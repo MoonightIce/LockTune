@@ -11,26 +11,53 @@ public enum IslandAttachment: String, Codable, Equatable, Sendable {
     case floatingCapsule
 }
 
+/// The container state is intentionally independent from IslandPresentation,
+/// which only selects the content category (idle, music, or meeting).
+public enum IslandExpansionState: String, Equatable, Sendable {
+    case collapsed
+    case hovered
+    case expanded
+}
+
 public struct IslandSurfaceGeometry: Equatable, Sendable {
     public let width: Double
     public let height: Double
     public let cornerRadius: Double
     public let topCornerRadius: Double
+    /// Additional width required around a hardware notch. Zero for a floating
+    /// capsule; the coordinator leaves the actual notch width to AppKit.
+    public let notchSideInset: Double
 
-    public init(width: Double, height: Double, cornerRadius: Double, topCornerRadius: Double) {
+    public init(
+        width: Double,
+        height: Double,
+        cornerRadius: Double,
+        topCornerRadius: Double,
+        notchSideInset: Double = 0
+    ) {
         self.width = width
         self.height = height
         self.cornerRadius = cornerRadius
         self.topCornerRadius = topCornerRadius
+        self.notchSideInset = notchSideInset
     }
 }
 
 public struct IslandMotionPolicy: Equatable, Sendable {
-    public let transitionDuration: Double
+    public let hoverDuration: Double
+    public let expansionDuration: Double
+    public let collapseDuration: Double
     public let animatesOpticalHighlight: Bool
 
-    public init(transitionDuration: Double, animatesOpticalHighlight: Bool) {
-        self.transitionDuration = transitionDuration
+    public init(
+        hoverDuration: Double,
+        expansionDuration: Double,
+        collapseDuration: Double,
+        animatesOpticalHighlight: Bool
+    ) {
+        self.hoverDuration = hoverDuration
+        self.expansionDuration = expansionDuration
+        self.collapseDuration = collapseDuration
         self.animatesOpticalHighlight = animatesOpticalHighlight
     }
 }

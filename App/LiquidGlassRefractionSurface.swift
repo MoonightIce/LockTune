@@ -73,15 +73,13 @@ enum LiquidGlassRuntimeAdapter {
         }
 
         let tint = tintColor(for: configuration.tintOpacity)
-        capabilities.underscoredTintSelectorAvailable = setObjectSPI(
-            view,
-            selectorName: "set_tintColor:",
-            value: tint
-        )
+        capabilities.underscoredTintSelectorAvailable = configuration.tintOpacity > 0
+            ? setObjectSPI(view, selectorName: "set_tintColor:", value: tint)
+            : clearTint(on: view)
         if !capabilities.underscoredTintSelectorAvailable {
             // Public tint is the supported fallback. Assigning nil here is
             // also the required cleanup path when a tint is removed later.
-            view.tintColor = tint
+            view.tintColor = configuration.tintOpacity > 0 ? tint : nil
         }
 
         capabilities.runtimeMode = configuration.privateRefractionEnabled
@@ -95,10 +93,12 @@ enum LiquidGlassRuntimeAdapter {
     }
 
     @available(macOS 26.0, *)
-    static func clearTint(on view: NSGlassEffectView) {
-        if !setObjectSPI(view, selectorName: "set_tintColor:", value: nil) {
+    static func clearTint(on view: NSGlassEffectView) -> Bool {
+        let cleared = setObjectSPI(view, selectorName: "set_tintColor:", value: nil)
+        if !cleared {
             view.tintColor = nil
         }
+        return cleared
     }
 
     @available(macOS 26.0, *)
@@ -174,6 +174,77 @@ final class LiquidGlassAuroraView: NSView {
     }
 }
 
+/// The single contour used by the Island's SwiftUI surface and every native
+/// material layer. SwiftUI owns the canonical (y-down) path; AppKit receives
+/// the vertically flipped equivalent for its layer mask.
+struct LiquidGlassSurfacePath: Equatable {
+    let attachment: IslandAttachment
+    let topRadius: CGFloat
+    let bottomRadius: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let width = max(0, rect.width)
+        let height = max(0, rect.height)
+        guard width > 0, height > 0 else { return Path() }
+        let top = min(max(0, topRadius), min(width / 2, height))
+        let bottom = min(max(0, bottomRadius), min(width / 2, height / 2))
+
+        guard attachment == .notchAttached else {
+            return UnevenRoundedRectangle(
+                cornerRadii: RectangleCornerRadii(
+                    topLeading: top,
+                    bottomLeading: bottom,
+                    bottomTrailing: bottom,
+                    topTrailing: top
+                ),
+                style: .continuous
+            )
+            .path(in: rect)
+        }
+
+        // A notched Island continues above the physical screen edge. The
+        // short cubic shoulders therefore enter the visible top edge from
+        // outside the local bounds instead of forming a second, inset shape.
+        let shoulderDepth = max(1, top * 0.7)
+        let shoulderEndY = min(height - bottom, max(top * 0.78, 1))
+        let kappa = 0.5522847498
+        var path = Path()
+        path.move(to: CGPoint(x: top, y: -shoulderDepth))
+        path.addLine(to: CGPoint(x: width - top, y: -shoulderDepth))
+        path.addCurve(
+            to: CGPoint(x: width, y: shoulderEndY),
+            control1: CGPoint(x: width - top * 0.24, y: -shoulderDepth),
+            control2: CGPoint(x: width, y: shoulderEndY * 0.14)
+        )
+        path.addLine(to: CGPoint(x: width, y: height - bottom))
+        path.addCurve(
+            to: CGPoint(x: width - bottom, y: height),
+            control1: CGPoint(x: width, y: height - bottom + bottom * kappa),
+            control2: CGPoint(x: width - bottom + bottom * kappa, y: height)
+        )
+        path.addLine(to: CGPoint(x: bottom, y: height))
+        path.addCurve(
+            to: CGPoint(x: 0, y: height - bottom),
+            control1: CGPoint(x: bottom - bottom * kappa, y: height),
+            control2: CGPoint(x: 0, y: height - bottom + bottom * kappa)
+        )
+        path.addLine(to: CGPoint(x: 0, y: shoulderEndY))
+        path.addCurve(
+            to: CGPoint(x: top, y: -shoulderDepth),
+            control1: CGPoint(x: 0, y: shoulderEndY * 0.14),
+            control2: CGPoint(x: top * 0.24, y: -shoulderDepth)
+        )
+        path.closeSubpath()
+        return path
+    }
+
+    func appKitPath(in bounds: CGRect) -> CGPath {
+        let canonical = path(in: CGRect(origin: .zero, size: bounds.size)).cgPath
+        var transform = CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: bounds.height)
+        return canonical.copy(using: &transform) ?? canonical
+    }
+}
+
 @MainActor
 final class LiquidGlassSurfaceHost: NSView {
     private(set) var auroraView = LiquidGlassAuroraView(frame: .zero)
@@ -186,23 +257,29 @@ final class LiquidGlassSurfaceHost: NSView {
     private var configuration: LiquidGlassConfiguration
     private let backdropSource: LiquidGlassBackdropSource
     private var cornerRadius: CGFloat
+    private var surfacePath: LiquidGlassSurfacePath?
+    private var activeAppearanceOverrideAvailable: Bool
 
     init(
         configuration: LiquidGlassConfiguration,
         backdropSource: LiquidGlassBackdropSource = .behindWindow,
         cornerRadius: CGFloat = 30,
+        surfacePath: LiquidGlassSurfacePath? = nil,
+        activeAppearanceOverrideAvailable: Bool = false,
         contentView: NSView? = nil
     ) {
         self.configuration = configuration
         self.backdropSource = backdropSource
         self.cornerRadius = cornerRadius
+        self.surfacePath = surfacePath
+        self.activeAppearanceOverrideAvailable = activeAppearanceOverrideAvailable
         super.init(frame: .zero)
         wantsLayer = true
         layer?.masksToBounds = true
         addSubview(auroraView)
         addSubview(backingView)
         if let contentView { setHostedContentView(contentView) }
-        update(configuration: configuration)
+        update(configuration: configuration, surfacePath: surfacePath)
     }
 
     required init?(coder: NSCoder) { nil }
@@ -216,13 +293,17 @@ final class LiquidGlassSurfaceHost: NSView {
 
     func update(
         configuration: LiquidGlassConfiguration,
-        cornerRadius: CGFloat? = nil
+        cornerRadius: CGFloat? = nil,
+        surfacePath: LiquidGlassSurfacePath? = nil,
+        activeAppearanceOverrideAvailable: Bool? = nil
     ) {
         self.configuration = configuration
         if let cornerRadius { self.cornerRadius = cornerRadius }
-        layer?.cornerRadius = max(0, self.cornerRadius)
-        layer?.cornerCurve = .continuous
-        layer?.masksToBounds = true
+        self.surfacePath = surfacePath
+        if let activeAppearanceOverrideAvailable {
+            self.activeAppearanceOverrideAvailable = activeAppearanceOverrideAvailable
+        }
+        applySurfaceGeometry()
 
         backingView.material = .menu
         backingView.blendingMode = backdropSource == .behindWindow ? .behindWindow : .withinWindow
@@ -230,9 +311,7 @@ final class LiquidGlassSurfaceHost: NSView {
         backingView.isEmphasized = false
         backingView.alphaValue = configuration.reduceTransparency ? 1 : configuration.backingAlpha
         backingView.wantsLayer = true
-        backingView.layer?.cornerRadius = layer?.cornerRadius ?? 0
-        backingView.layer?.cornerCurve = .continuous
-        backingView.layer?.masksToBounds = true
+        applyChildGeometry(to: backingView)
 
         if configuration.reduceTransparency {
             replaceGlassView(nil)
@@ -256,11 +335,39 @@ final class LiquidGlassSurfaceHost: NSView {
         backingView.frame = bounds
         glassView?.frame = bounds
         hostedContentView?.frame = bounds
+        applySurfaceGeometry()
         for view in [auroraView, backingView, glassView, hostedContentView].compactMap({ $0 }) {
             view.wantsLayer = true
-            view.layer?.cornerRadius = layer?.cornerRadius ?? 0
-            view.layer?.cornerCurve = .continuous
-            view.layer?.masksToBounds = true
+            applyChildGeometry(to: view)
+        }
+    }
+
+    private func applySurfaceGeometry() {
+        layer?.cornerCurve = .continuous
+        layer?.masksToBounds = true
+        guard let surfacePath else {
+            layer?.mask = nil
+            layer?.cornerRadius = max(0, cornerRadius)
+            return
+        }
+
+        layer?.cornerRadius = 0
+        let mask = (layer?.mask as? CAShapeLayer) ?? CAShapeLayer()
+        mask.frame = bounds
+        mask.path = surfacePath.appKitPath(in: bounds)
+        layer?.mask = mask
+    }
+
+    private func applyChildGeometry(to view: NSView) {
+        guard let viewLayer = view.layer else { return }
+        viewLayer.cornerCurve = .continuous
+        if surfacePath != nil {
+            viewLayer.mask = nil
+            viewLayer.cornerRadius = 0
+            viewLayer.masksToBounds = false
+        } else {
+            viewLayer.cornerRadius = layer?.cornerRadius ?? 0
+            viewLayer.masksToBounds = true
         }
     }
 
@@ -277,12 +384,15 @@ final class LiquidGlassSurfaceHost: NSView {
     private func configureGlassView() {
         guard let glassView else { return }
         glassView.wantsLayer = true
-        glassView.layer?.cornerRadius = layer?.cornerRadius ?? 0
-        glassView.layer?.cornerCurve = .continuous
-        glassView.layer?.masksToBounds = true
+        applyChildGeometry(to: glassView)
         if #available(macOS 26.0, *), let native = glassView as? NSGlassEffectView {
             native.cornerRadius = layer?.cornerRadius ?? 0
             capabilities = LiquidGlassRuntimeAdapter.configure(native, configuration: configuration)
+            capabilities.activeAppearanceOverrideAvailable = activeAppearanceOverrideAvailable
+            if capabilities.runtimeMode == .completePrivateRefraction,
+               !activeAppearanceOverrideAvailable {
+                capabilities.runtimeMode = .publicGlassFallback
+            }
             runtimeMode = capabilities.runtimeMode
         }
     }
@@ -299,8 +409,10 @@ final class LiquidGlassSurfaceHost: NSView {
 struct LiquidGlassSurfaceContainer<Content: View>: NSViewRepresentable {
     @Bindable var session: AppSession
     let cornerRadius: CGFloat
+    var surfacePath: LiquidGlassSurfacePath? = nil
     var backdropSource: LiquidGlassBackdropSource = .behindWindow
     var reduceTransparency = false
+    var activeAppearanceOverrideAvailable = false
     let content: () -> Content
 
     private var configuration: LiquidGlassConfiguration {
@@ -319,6 +431,8 @@ struct LiquidGlassSurfaceContainer<Content: View>: NSViewRepresentable {
             configuration: configuration,
             backdropSource: backdropSource,
             cornerRadius: cornerRadius,
+            surfacePath: surfacePath,
+            activeAppearanceOverrideAvailable: activeAppearanceOverrideAvailable,
             contentView: contentView
         )
         session.setLiquidGlassRuntimeMode(host.runtimeMode)
@@ -328,7 +442,9 @@ struct LiquidGlassSurfaceContainer<Content: View>: NSViewRepresentable {
     func updateNSView(_ host: LiquidGlassSurfaceHost, context: Context) {
         host.update(
             configuration: configuration,
-            cornerRadius: cornerRadius
+            cornerRadius: cornerRadius,
+            surfacePath: surfacePath,
+            activeAppearanceOverrideAvailable: activeAppearanceOverrideAvailable
         )
         if let contentView = host.hostedContentView as? NSHostingView<Content> {
             contentView.rootView = content()

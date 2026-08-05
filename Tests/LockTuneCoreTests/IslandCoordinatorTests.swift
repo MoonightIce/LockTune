@@ -34,25 +34,34 @@ func islandVisibilityHonorsPrivacyAndPreference() {
     #expect(!coordinator.isVisible(isEnabled: false, isSessionActive: false))
 }
 
-@Test("Island geometry keeps one surface while adapting to content and hardware")
+@Test("Island geometry separates content from three container expansion states")
 func islandGeometryAdaptsToPresentationAndAttachment() {
     let coordinator = IslandCoordinator()
 
-    #expect(coordinator.geometry(for: .music, attachment: .floatingCapsule) == IslandSurfaceGeometry(
-        width: 420,
-        height: 82,
-        cornerRadius: 30,
-        topCornerRadius: 30
+    for attachment in [IslandAttachment.floatingCapsule, .notchAttached] {
+        #expect(coordinator.geometry(for: .idle, attachment: attachment, expansionState: .collapsed).height == 42)
+        #expect(coordinator.geometry(for: .idle, attachment: attachment, expansionState: .hovered).height == 47)
+        #expect(coordinator.geometry(for: .idle, attachment: attachment, expansionState: .expanded).height == 132)
+    }
+
+    #expect(coordinator.geometry(for: .idle, attachment: .floatingCapsule, expansionState: .collapsed) == IslandSurfaceGeometry(
+        width: 196, height: 42, cornerRadius: 21, topCornerRadius: 21
     ))
-    #expect(coordinator.geometry(for: .music, attachment: .notchAttached) == IslandSurfaceGeometry(
-        width: 420,
-        height: 82,
-        cornerRadius: 30,
-        topCornerRadius: 0
+    #expect(coordinator.geometry(for: .idle, attachment: .floatingCapsule, expansionState: .hovered) == IslandSurfaceGeometry(
+        width: 208, height: 47, cornerRadius: 23.5, topCornerRadius: 23.5
     ))
-    #expect(coordinator.geometry(for: .idle, attachment: .notchAttached).height == 70)
-    #expect(coordinator.geometry(for: .idle, attachment: .floatingCapsule).height == 54)
-    #expect(coordinator.geometry(for: .meeting, attachment: .notchAttached).width == 440)
+    #expect(coordinator.geometry(for: .music, attachment: .floatingCapsule, expansionState: .expanded) == IslandSurfaceGeometry(
+        width: 420, height: 132, cornerRadius: 32, topCornerRadius: 32
+    ))
+    #expect(coordinator.geometry(for: .music, attachment: .notchAttached, expansionState: .collapsed) == IslandSurfaceGeometry(
+        width: 0, height: 42, cornerRadius: 21, topCornerRadius: 10, notchSideInset: 20
+    ))
+    #expect(coordinator.geometry(for: .music, attachment: .notchAttached, expansionState: .hovered) == IslandSurfaceGeometry(
+        width: 0, height: 47, cornerRadius: 23, topCornerRadius: 11, notchSideInset: 32
+    ))
+    #expect(coordinator.geometry(for: .meeting, attachment: .notchAttached, expansionState: .expanded) == IslandSurfaceGeometry(
+        width: 440, height: 132, cornerRadius: 26, topCornerRadius: 12, notchSideInset: 24
+    ))
 }
 
 @Test("Reduce Motion removes surface and optical animation")
@@ -60,14 +69,44 @@ func reduceMotionStopsIslandAnimation() {
     let coordinator = IslandCoordinator()
 
     #expect(coordinator.motion(reduceMotion: false, materialMotionEnabled: true) == IslandMotionPolicy(
-        transitionDuration: 0.28,
+        hoverDuration: 0.22,
+        expansionDuration: 0.38,
+        collapseDuration: 0.30,
         animatesOpticalHighlight: true
     ))
     #expect(coordinator.motion(reduceMotion: true, materialMotionEnabled: true) == IslandMotionPolicy(
-        transitionDuration: 0,
+        hoverDuration: 0,
+        expansionDuration: 0,
+        collapseDuration: 0,
         animatesOpticalHighlight: false
     ))
     #expect(!coordinator.motion(reduceMotion: false, materialMotionEnabled: false).animatesOpticalHighlight)
+}
+
+@Test("Island geometry preserves top gap and notch width invariants")
+func islandGeometryPreservesDisplayInvariants() {
+    let coordinator = IslandCoordinator()
+    #expect(coordinator.floatingTopGap(menuBarHeight: 0) == 6)
+    #expect(coordinator.floatingTopGap(menuBarHeight: 24) == 8)
+    #expect(coordinator.floatingTopGap(menuBarHeight: 60) == 10)
+
+    let collapsed = coordinator.geometry(for: .idle, attachment: .notchAttached, expansionState: .collapsed)
+    #expect(coordinator.resolvedWidth(
+        for: collapsed,
+        attachment: .notchAttached,
+        hardwareNotchWidth: 180
+    ) == 200)
+    #expect(coordinator.resolvedWidth(
+        for: collapsed,
+        attachment: .notchAttached,
+        hardwareNotchWidth: 260
+    ) == 280)
+    #expect(coordinator.resolvedWidth(
+        for: coordinator.geometry(for: .idle, attachment: .floatingCapsule, expansionState: .expanded),
+        attachment: .floatingCapsule,
+        hardwareNotchWidth: 0,
+        availableWidth: 400
+    ) == 400)
 }
 
 @Test("Preferred display wins, otherwise the current main display is used")

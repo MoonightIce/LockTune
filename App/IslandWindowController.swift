@@ -3,9 +3,16 @@ import LockTuneCore
 import LockTuneDomain
 import SwiftUI
 
+private extension Notification.Name {
+    static let lockTuneIslandEscape = Notification.Name("LockTune.IslandEscape")
+}
+
 @MainActor
 final class IslandWindowController {
-    private static let panelSize = NSSize(width: 440, height: 82)
+    // The transparent panel reserves the maximum expanded height. The visible
+    // surface inside it morphs between 42, 47 and 132 points while its top
+    // anchor remains fixed.
+    private static let panelSize = NSSize(width: 440, height: 132)
 
     private var panel: IslandPanel?
     private weak var session: AppSession?
@@ -14,6 +21,7 @@ final class IslandWindowController {
     private var isEnabled = true
     private var displayedScreenID: CGDirectDisplayID?
     private var activeAppearanceCapabilities: LiquidGlassActiveAppearanceCapabilities?
+    private var keyMonitor: Any?
     private let coordinator = IslandCoordinator()
 
     func show(session: AppSession) {
@@ -22,6 +30,9 @@ final class IslandWindowController {
         isEnabled = session.isIslandEnabled
         let activeAppearance = LiquidGlassActiveAppearanceOverride.apply(to: IslandPanel.self)
         activeAppearanceCapabilities = activeAppearance
+        session.setIslandActiveAppearanceOverrideAvailable(
+            activeAppearance.allSelectorsPresent && activeAppearance.allSelectorsInstalled
+        )
         let panel = IslandPanel(
             contentRect: NSRect(origin: .zero, size: Self.panelSize),
             styleMask: [.borderless, .nonactivatingPanel],
@@ -42,6 +53,7 @@ final class IslandWindowController {
         self.panel = panel
         reposition()
         installObservers()
+        installEscapeMonitor()
         if shouldBeVisible { panel.orderFrontRegardless() }
     }
 
@@ -58,6 +70,8 @@ final class IslandWindowController {
     func close() {
         observers.forEach(NotificationCenter.default.removeObserver)
         observers.removeAll()
+        if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
+        keyMonitor = nil
         panel?.close()
         panel = nil
         session = nil
@@ -67,12 +81,16 @@ final class IslandWindowController {
     func reposition() {
         guard shouldBeVisible, let panel, let screen = targetScreen else { return }
         let attachment: IslandAttachment = screen.hasHardwareNotch ? .notchAttached : .floatingCapsule
-        let topGap: CGFloat = attachment == .notchAttached ? 0 : 8
+        let menuBarHeight = screen.frame.maxY - screen.visibleFrame.maxY
+        let topGap: CGFloat = attachment == .notchAttached
+            ? 0
+            : CGFloat(coordinator.floatingTopGap(menuBarHeight: Double(menuBarHeight)))
         let anchorY = attachment == .notchAttached ? screen.frame.maxY : screen.visibleFrame.maxY
+        let panelWidth = min(Self.panelSize.width, max(1, screen.visibleFrame.width))
         let frame = NSRect(
-            x: (screen.frame.midX - panel.frame.width / 2).rounded(),
+            x: (screen.frame.midX - panelWidth / 2).rounded(),
             y: (anchorY - panel.frame.height - topGap).rounded(),
-            width: panel.frame.width,
+            width: panelWidth,
             height: panel.frame.height
         )
         let screenID = screen.lockTuneDisplayID
@@ -132,6 +150,14 @@ final class IslandWindowController {
         })
     }
 
+    private func installEscapeMonitor() {
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == 53, self?.shouldBeVisible == true else { return event }
+            NotificationCenter.default.post(name: .lockTuneIslandEscape, object: nil)
+            return nil
+        }
+    }
+
     private var targetScreen: NSScreen? {
         let screens = NSScreen.screens
         let resolved = coordinator.resolveDisplay(
@@ -185,7 +211,8 @@ private struct IslandView: View {
     @Bindable var session: AppSession
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @State private var isHovered = false
+    @State private var expansionState: IslandExpansionState = .collapsed
+    @State private var revealExpandedContent = false
 
     private let coordinator = IslandCoordinator()
 
@@ -195,38 +222,89 @@ private struct IslandView: View {
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .scaleEffect(isHovered && !reduceMotion ? 1.008 : 1, anchor: .top)
-        .animation(surfaceAnimation, value: geometry)
-        .animation(surfaceAnimation, value: session.islandAttachment)
+        .animation(containerAnimation, value: geometry)
+        .animation(containerAnimation, value: expansionState)
+        .animation(containerAnimation, value: session.islandAttachment)
+        .onExitCommand { collapse() }
+        .onReceive(NotificationCenter.default.publisher(for: .lockTuneIslandEscape)) { _ in
+            collapse()
+        }
+        .task(id: expansionState) {
+            guard expansionState == .expanded else {
+                revealExpandedContent = false
+                return
+            }
+            if reduceMotion {
+                revealExpandedContent = true
+                return
+            }
+            try? await Task.sleep(nanoseconds: 100_000_000)
+            guard !Task.isCancelled, expansionState == .expanded else { return }
+            withAnimation(revealAnimation) { revealExpandedContent = true }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("island.accessibility")
     }
 
     private var islandSurface: some View {
-        LiquidGlassSurfaceContainer(
+        IslandSurfaceMorph(
             session: session,
-            cornerRadius: CGFloat(geometry.cornerRadius),
-            backdropSource: .behindWindow,
-            reduceTransparency: reduceTransparency
+            attachment: session.islandAttachment,
+            width: resolvedWidth,
+            height: CGFloat(geometry.height),
+            topRadius: CGFloat(geometry.topCornerRadius),
+            bottomRadius: CGFloat(geometry.cornerRadius),
+            reduceTransparency: reduceTransparency,
+            activeAppearanceOverrideAvailable: session.islandActiveAppearanceOverrideAvailable
         ) {
-            VStack(spacing: 0) {
-                if session.islandAttachment == .notchAttached {
-                    Color.clear
-                        .frame(height: notchClearance)
-                        .allowsHitTesting(false)
-                }
-                IslandContent {
-                    content
-                }
+            ZStack {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { surfaceTapped() }
+
+                VStack(spacing: 0) {
+                    if session.islandAttachment == .notchAttached {
+                        Color.clear
+                            .frame(height: notchClearance)
+                            .allowsHitTesting(false)
+                    }
+                    IslandContent {
+                        ZStack {
+                            compactContent
+                                .opacity(expansionState == .expanded ? 0 : 1)
+                            content
+                                .opacity(revealExpandedContent ? 1 : 0)
+                                .allowsHitTesting(expansionState == .expanded && revealExpandedContent)
+                        }
+                    }
                     .frame(maxHeight: .infinity)
+                }
             }
             .padding(.horizontal, 16)
         }
-        .frame(width: resolvedWidth, height: CGFloat(geometry.height))
-        .clipShape(shape)
-        .contentShape(shape)
-        .onHover { isHovered = $0 }
-        .shadow(color: .black.opacity(session.islandAttachment == .notchAttached ? 0.18 : 0.24), radius: 18, y: 8)
+        .onHover { updateHover($0) }
+    }
+
+    @ViewBuilder
+    private var compactContent: some View {
+        switch presentation {
+        case .music:
+            HStack(spacing: 8) {
+                Image(systemName: "music.note")
+                Text(session.currentTrackTitle)
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+            }
+        case .meeting:
+            HStack(spacing: 8) {
+                Image(systemName: "calendar.badge.clock")
+                Text(primaryText)
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+            }
+        case .idle:
+            idleContent
+        }
     }
 
     @ViewBuilder
@@ -346,29 +424,70 @@ private struct IslandView: View {
 
     private var presentation: IslandPresentation { session.islandPresentation }
     private var geometry: IslandSurfaceGeometry {
-        coordinator.geometry(for: presentation, attachment: session.islandAttachment)
+        coordinator.geometry(
+            for: presentation,
+            attachment: session.islandAttachment,
+            expansionState: expansionState
+        )
     }
     private var resolvedWidth: CGFloat {
-        let contentWidth = CGFloat(geometry.width)
-        guard session.islandAttachment == .notchAttached else { return contentWidth }
-        return max(contentWidth, CGFloat(session.islandHardwareNotchWidth) + 40)
+        let availableWidth = targetScreen.map { Double(max(0, $0.visibleFrame.width - 32)) }
+        return CGFloat(coordinator.resolvedWidth(
+            for: geometry,
+            attachment: session.islandAttachment,
+            hardwareNotchWidth: session.islandHardwareNotchWidth,
+            availableWidth: availableWidth
+        ))
     }
     private var notchClearance: CGFloat {
         min(32, CGFloat(geometry.height) * 0.42)
     }
-    private var shape: IslandContinuousShape {
-        IslandContinuousShape(
-            topRadius: CGFloat(geometry.topCornerRadius),
-            bottomRadius: CGFloat(geometry.cornerRadius)
-        )
+    private var targetScreen: NSScreen? {
+        if let preferredID = session.preferredIslandDisplayID,
+           let preferred = NSScreen.screens.first(where: { $0.lockTuneDisplayID.map(String.init) == preferredID }) {
+            return preferred
+        }
+        return NSScreen.main ?? NSScreen.screens.first
     }
-    private var surfaceAnimation: Animation? {
+    private var containerAnimation: Animation? {
+        animation(for: expansionState)
+    }
+    private var revealAnimation: Animation? {
+        guard !reduceMotion else { return nil }
+        return .easeOut(duration: 0.16)
+    }
+    private func animation(for state: IslandExpansionState) -> Animation? {
         let policy = coordinator.motion(
             reduceMotion: reduceMotion,
             materialMotionEnabled: session.glassMotionEnabled
         )
-        guard policy.transitionDuration > 0 else { return nil }
-        return .spring(duration: policy.transitionDuration, bounce: 0.12)
+        switch state {
+        case .hovered:
+            guard policy.hoverDuration > 0 else { return nil }
+            return .easeOut(duration: policy.hoverDuration)
+        case .expanded:
+            guard policy.expansionDuration > 0 else { return nil }
+            return .spring(duration: policy.expansionDuration, bounce: 0.11)
+        case .collapsed:
+            guard policy.collapseDuration > 0 else { return nil }
+            return .easeInOut(duration: policy.collapseDuration)
+        }
+    }
+    private func updateHover(_ hovering: Bool) {
+        guard expansionState != .expanded else { return }
+        transition(to: hovering ? .hovered : .collapsed)
+    }
+    private func surfaceTapped() {
+        transition(to: expansionState == .expanded ? .collapsed : .expanded)
+    }
+    private func collapse() {
+        guard expansionState != .collapsed else { return }
+        transition(to: .collapsed)
+    }
+    private func transition(to state: IslandExpansionState) {
+        withAnimation(animation(for: state)) {
+            expansionState = state
+        }
     }
     private var progress: Double {
         guard let duration = session.playback.duration, duration > 0 else { return 0 }
@@ -384,6 +503,65 @@ private struct IslandView: View {
     }
 }
 
+/// Animates the numeric surface values themselves so SwiftUI's clip shape and
+/// the AppKit host receive the same intermediate path on every animation frame.
+@MainActor
+private struct IslandSurfaceMorph<Content: View>: View, @preconcurrency Animatable {
+    @Bindable var session: AppSession
+    let attachment: IslandAttachment
+    var width: CGFloat
+    var height: CGFloat
+    var topRadius: CGFloat
+    var bottomRadius: CGFloat
+    let reduceTransparency: Bool
+    let activeAppearanceOverrideAvailable: Bool
+    let content: () -> Content
+
+    var animatableData: AnimatablePair<CGFloat, AnimatablePair<CGFloat, AnimatablePair<CGFloat, CGFloat>>> {
+        get {
+            AnimatablePair(
+                width,
+                AnimatablePair(height, AnimatablePair(topRadius, bottomRadius))
+            )
+        }
+        set {
+            width = newValue.first
+            height = newValue.second.first
+            topRadius = newValue.second.second.first
+            bottomRadius = newValue.second.second.second
+        }
+    }
+
+    var body: some View {
+        let path = LiquidGlassSurfacePath(
+            attachment: attachment,
+            topRadius: topRadius,
+            bottomRadius: bottomRadius
+        )
+        let shape = IslandContinuousShape(
+            attachment: attachment,
+            topRadius: topRadius,
+            bottomRadius: bottomRadius
+        )
+        return LiquidGlassSurfaceContainer(
+            session: session,
+            cornerRadius: max(topRadius, bottomRadius),
+            surfacePath: path,
+            backdropSource: .behindWindow,
+            reduceTransparency: reduceTransparency,
+            activeAppearanceOverrideAvailable: activeAppearanceOverrideAvailable,
+            content: content
+        )
+        .frame(width: width, height: height)
+        .clipShape(shape)
+        .overlay {
+            shape.stroke(.white.opacity(reduceTransparency ? 0.18 : 0.12), lineWidth: 0.55)
+        }
+        .contentShape(shape)
+        .shadow(color: .black.opacity(attachment == .notchAttached ? 0.18 : 0.24), radius: 18, y: 8)
+    }
+}
+
 private struct IslandContent<Content: View>: View {
     let content: () -> Content
 
@@ -391,6 +569,7 @@ private struct IslandContent<Content: View>: View {
 }
 
 private struct IslandContinuousShape: Shape {
+    var attachment: IslandAttachment
     var topRadius: CGFloat
     var bottomRadius: CGFloat
 
@@ -403,14 +582,10 @@ private struct IslandContinuousShape: Shape {
     }
 
     func path(in rect: CGRect) -> Path {
-        UnevenRoundedRectangle(
-            cornerRadii: RectangleCornerRadii(
-                topLeading: topRadius,
-                bottomLeading: bottomRadius,
-                bottomTrailing: bottomRadius,
-                topTrailing: topRadius
-            ),
-            style: .continuous
+        LiquidGlassSurfacePath(
+            attachment: attachment,
+            topRadius: topRadius,
+            bottomRadius: bottomRadius
         )
         .path(in: rect)
     }

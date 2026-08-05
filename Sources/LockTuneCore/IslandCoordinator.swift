@@ -22,21 +22,59 @@ public struct IslandCoordinator: Sendable {
 
     public func geometry(
         for presentation: IslandPresentation,
-        attachment: IslandAttachment
+        attachment: IslandAttachment,
+        expansionState: IslandExpansionState
     ) -> IslandSurfaceGeometry {
-        let dimensions: (width: Double, height: Double, radius: Double)
-        switch presentation {
-        case .idle:
-            dimensions = attachment == .notchAttached ? (210, 70, 27) : (210, 54, 27)
-        case .music: dimensions = (420, 82, 30)
-        case .meeting: dimensions = (440, 76, 30)
+        let isNotched = attachment == .notchAttached
+        switch expansionState {
+        case .collapsed:
+            return IslandSurfaceGeometry(
+                width: isNotched ? 0 : 196,
+                height: 42,
+                cornerRadius: isNotched ? 21 : 21,
+                topCornerRadius: isNotched ? 10 : 21,
+                notchSideInset: isNotched ? 20 : 0
+            )
+        case .hovered:
+            return IslandSurfaceGeometry(
+                width: isNotched ? 0 : 208,
+                height: 47,
+                cornerRadius: isNotched ? 23 : 23.5,
+                topCornerRadius: isNotched ? 11 : 23.5,
+                notchSideInset: isNotched ? 32 : 0
+            )
+        case .expanded:
+            let expandedWidth: Double
+            switch presentation {
+            case .idle, .music: expandedWidth = 420
+            case .meeting: expandedWidth = 440
+            }
+            return IslandSurfaceGeometry(
+                width: expandedWidth,
+                height: 132,
+                cornerRadius: isNotched ? 26 : 32,
+                topCornerRadius: isNotched ? 12 : 32,
+                notchSideInset: isNotched ? 24 : 0
+            )
         }
-        return IslandSurfaceGeometry(
-            width: dimensions.width,
-            height: dimensions.height,
-            cornerRadius: dimensions.radius,
-            topCornerRadius: attachment == .notchAttached ? 0 : dimensions.radius
-        )
+    }
+
+    public func floatingTopGap(menuBarHeight: Double) -> Double {
+        min(max(max(0, menuBarHeight) / 3, 6), 10)
+    }
+
+    public func resolvedWidth(
+        for geometry: IslandSurfaceGeometry,
+        attachment: IslandAttachment,
+        hardwareNotchWidth: Double,
+        availableWidth: Double? = nil
+    ) -> Double {
+        let minimumNotchWidth = attachment == .notchAttached
+            ? max(0, hardwareNotchWidth) + geometry.notchSideInset
+            : 0
+        let preferredWidth = max(geometry.width, minimumNotchWidth)
+        guard let availableWidth else { return preferredWidth }
+        return min(preferredWidth, max(minimumNotchWidth, availableWidth))
     }
 
     public func motion(
@@ -44,7 +82,9 @@ public struct IslandCoordinator: Sendable {
         materialMotionEnabled: Bool
     ) -> IslandMotionPolicy {
         IslandMotionPolicy(
-            transitionDuration: reduceMotion ? 0 : 0.28,
+            hoverDuration: reduceMotion ? 0 : 0.22,
+            expansionDuration: reduceMotion ? 0 : 0.38,
+            collapseDuration: reduceMotion ? 0 : 0.30,
             animatesOpticalHighlight: !reduceMotion && materialMotionEnabled
         )
     }
