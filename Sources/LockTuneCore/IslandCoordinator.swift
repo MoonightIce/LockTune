@@ -89,6 +89,16 @@ public struct IslandCoordinator: Sendable {
         )
     }
 
+    /// The hardware notch consumes the top portion of the collapsed and
+    /// hovered surface. Text in that narrow remainder is not readable, so
+    /// compact copy is reserved for floating capsules and expanded panels.
+    public func showsCompactContent(
+        attachment: IslandAttachment,
+        expansionState: IslandExpansionState
+    ) -> Bool {
+        attachment != .notchAttached || expansionState == .expanded
+    }
+
     public func resolveDisplay(
         preferredID: String?,
         mainDisplayID: String?,

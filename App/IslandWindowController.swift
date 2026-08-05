@@ -5,6 +5,7 @@ import SwiftUI
 
 private extension Notification.Name {
     static let lockTuneIslandEscape = Notification.Name("LockTune.IslandEscape")
+    static let lockTuneIslandPointerDown = Notification.Name("LockTune.IslandPointerDown")
 }
 
 @MainActor
@@ -49,7 +50,7 @@ final class IslandWindowController {
         panel.isMovable = false
         panel.acceptsMouseMovedEvents = true
         panel.setAccessibilityLabel(String(localized: "island.accessibility"))
-        panel.contentView = NSHostingView(rootView: IslandView(session: session))
+        panel.contentView = IslandContentHostingView(rootView: IslandView(session: session))
         self.panel = panel
         reposition()
         installObservers()
@@ -189,6 +190,23 @@ final class IslandWindowController {
 private final class IslandPanel: NSPanel {
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
+
+    override func sendEvent(_ event: NSEvent) {
+        // A nonactivating status-bar panel does not reliably deliver SwiftUI's
+        // gesture recognizer. Bridge only the initial pointer down; the view
+        // decides whether this is an expand or collapse transition.
+        if event.type == .leftMouseDown {
+            NotificationCenter.default.post(
+                name: .lockTuneIslandPointerDown,
+                object: nil
+            )
+        }
+        super.sendEvent(event)
+    }
+}
+
+private final class IslandContentHostingView: NSHostingView<IslandView> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
 extension NSScreen {
@@ -229,6 +247,10 @@ private struct IslandView: View {
         .onReceive(NotificationCenter.default.publisher(for: .lockTuneIslandEscape)) { _ in
             collapse()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .lockTuneIslandPointerDown)) { _ in
+            guard expansionState != .expanded else { return }
+            surfaceTapped()
+        }
         .task(id: expansionState) {
             guard expansionState == .expanded else {
                 revealExpandedContent = false
@@ -259,8 +281,13 @@ private struct IslandView: View {
         ) {
             ZStack {
                 Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture { surfaceTapped() }
+                    .allowsHitTesting(false)
+
+                if expansionState == .expanded {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture { collapse() }
+                }
 
                 VStack(spacing: 0) {
                     if session.islandAttachment == .notchAttached {
@@ -270,8 +297,13 @@ private struct IslandView: View {
                     }
                     IslandContent {
                         ZStack {
-                            compactContent
-                                .opacity(expansionState == .expanded ? 0 : 1)
+                            if coordinator.showsCompactContent(
+                                attachment: session.islandAttachment,
+                                expansionState: expansionState
+                            ) {
+                                compactContent
+                                    .opacity(expansionState == .expanded ? 0 : 1)
+                            }
                             content
                                 .opacity(revealExpandedContent ? 1 : 0)
                                 .allowsHitTesting(expansionState == .expanded && revealExpandedContent)

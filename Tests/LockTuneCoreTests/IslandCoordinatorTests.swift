@@ -83,6 +83,16 @@ func reduceMotionStopsIslandAnimation() {
     #expect(!coordinator.motion(reduceMotion: false, materialMotionEnabled: false).animatesOpticalHighlight)
 }
 
+@Test("Notch compact states do not render copy inside the hardware cutout")
+func islandCompactContentAvoidsNotchCutout() {
+    let coordinator = IslandCoordinator()
+    #expect(coordinator.showsCompactContent(attachment: .floatingCapsule, expansionState: .collapsed))
+    #expect(coordinator.showsCompactContent(attachment: .floatingCapsule, expansionState: .hovered))
+    #expect(!coordinator.showsCompactContent(attachment: .notchAttached, expansionState: .collapsed))
+    #expect(!coordinator.showsCompactContent(attachment: .notchAttached, expansionState: .hovered))
+    #expect(coordinator.showsCompactContent(attachment: .notchAttached, expansionState: .expanded))
+}
+
 @Test("Island geometry preserves top gap and notch width invariants")
 func islandGeometryPreservesDisplayInvariants() {
     let coordinator = IslandCoordinator()
