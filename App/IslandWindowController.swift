@@ -12,8 +12,8 @@ private extension Notification.Name {
 @MainActor
 final class IslandWindowController {
     // The transparent panel reserves the maximum expanded height. The visible
-    // surface inside it morphs between 42, 47 and 132 points while its top
-    // anchor remains fixed.
+    // surface inside it morphs between the session's collapsed reference
+    // height, 47 and 132 points while its top anchor remains fixed.
     private static let panelSize = NSSize(width: 440, height: 132)
 
     private var panel: IslandPanel?
@@ -100,10 +100,10 @@ final class IslandWindowController {
             height: placement.frame.height
         )
         let screenID = displayGeometry.displayID
-        session?.updateIslandDisplayEnvironment(
-            displays: displayDescriptors,
-            geometry: displayGeometry
-        )
+        let displays = displayDescriptors
+        if session?.availableIslandDisplays != displays || session?.islandDisplayGeometry != displayGeometry {
+            session?.updateIslandDisplayEnvironment(displays: displays, geometry: displayGeometry)
+        }
         if panel.frame != requestedFrame || displayedScreenID != screenID {
             panel.orderOut(nil)
             panel.setFrame(requestedFrame, display: false)
@@ -186,6 +186,32 @@ final class IslandWindowController {
         )
     }
 
+    private func validateCurrentPlacement() {
+        guard shouldBeVisible,
+              let panel,
+              let screen = targetScreen,
+              let displayGeometry = session?.islandDisplayGeometry
+        else { return }
+        let panelWidth = min(Self.panelSize.width, max(1, displayGeometry.visibleFrame.width))
+        let placement = coordinator.panelPlacement(
+            for: displayGeometry,
+            panelWidth: Double(panelWidth),
+            panelHeight: Double(panel.frame.height)
+        )
+        validatePlacement(
+            panel: panel,
+            targetScreen: screen,
+            displayGeometry: displayGeometry,
+            requestedFrame: NSRect(
+                x: placement.frame.minX,
+                y: placement.frame.minY,
+                width: placement.frame.width,
+                height: placement.frame.height
+            ),
+            placement: placement
+        )
+    }
+
     private func surfaceGlobalFrame(in panel: IslandPanel) -> NSRect? {
         guard let host = findSurfaceHost(in: panel.contentView),
               let window = host.window
@@ -258,13 +284,11 @@ final class IslandWindowController {
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self else { return }
-                self.reposition()
                 // The state notification marks the start of the shared SwiftUI
                 // animation. Validate again after the longest 0.38s morph so
                 // each final state has a recorded surface-global top error.
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
-                    MainActor.assumeIsolated { self?.reposition() }
+                    MainActor.assumeIsolated { self?.validateCurrentPlacement() }
                 }
             }
         })
@@ -407,6 +431,9 @@ private struct IslandView: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var expansionState: IslandExpansionState = .collapsed
     @State private var revealExpandedContent = false
+    /// The collapsed wings start visible so a launch into the collapsed state
+    /// does not wait on a contraction that never happens.
+    @State private var wingIconsRevealed = true
 
     private let coordinator = IslandCoordinator()
 
@@ -416,7 +443,6 @@ private struct IslandView: View {
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .animation(containerAnimation, value: geometry)
         .animation(containerAnimation, value: expansionState)
         .animation(containerAnimation, value: session.islandAttachment)
         .onExitCommand { collapse() }
@@ -430,8 +456,13 @@ private struct IslandView: View {
         .task(id: expansionState) {
             guard expansionState == .expanded else {
                 revealExpandedContent = false
+                await revealWingsAfterContraction()
                 return
             }
+            // The wings belong to the collapsed silhouette. Dropping them on the
+            // way out is what makes the next collapse re-reveal them only after
+            // the surface has finished contracting.
+            wingIconsRevealed = false
             if reduceMotion {
                 revealExpandedContent = true
                 return
@@ -445,17 +476,50 @@ private struct IslandView: View {
     }
 
     private var islandSurface: some View {
-        IslandSurfaceMorph(
+        let wingOnlyCompact = session.islandAttachment == .notchAttached
+            && expansionState == .collapsed
+        return IslandSurfaceMorph(
             session: session,
             attachment: session.islandAttachment,
             width: resolvedWidth,
             height: CGFloat(geometry.height),
             topRadius: CGFloat(geometry.topCornerRadius),
             bottomRadius: CGFloat(geometry.cornerRadius),
+            shoulderInset: CGFloat(geometry.shoulderInset),
             reduceTransparency: reduceTransparency,
-            activeAppearanceOverrideAvailable: session.islandActiveAppearanceOverrideAvailable
+            activeAppearanceOverrideAvailable: session.islandActiveAppearanceOverrideAvailable,
+            // The expanded surface fills the panel to within 10pt, far less
+            // than the 18pt shadow radius, so the window edge would clip the
+            // soft falloff into two hard-edged grey bands. Narrower states
+            // keep their shadow because the panel has room to render it.
+            shadowEnabled: !wingOnlyCompact && expansionState != .expanded,
+            // Any shaded surface supplies its own darkness, so the frosted
+            // backing is cleared to keep the ramp's floor at its measured value
+            // instead of hazing it toward grey.
+            backingLevelOverride: expansionState == .collapsed ? nil : .clear,
+            contentRevision: islandContentRevision
         ) {
             ZStack {
+                if wingOnlyCompact {
+                    // The collapsed notch silhouette is intentionally opaque
+                    // black. It still travels through the same glass host and
+                    // path, but the hardware cutout and both icon wings read
+                    // as one continuous black shape.
+                    Color.black
+                        .allowsHitTesting(false)
+                } else if expansionState != .collapsed {
+                    // One vertical ramp over the same refractive host, shared by
+                    // the hovered and expanded surfaces so the shade animates
+                    // continuously between them. It must reach both side edges,
+                    // so the content inset lives on the content stack rather
+                    // than on this container.
+                    IslandShadeLayer(
+                        coordinator: coordinator,
+                        statusBarHeight: statusBarBandHeight,
+                        reduceTransparency: reduceTransparency
+                    )
+                    .allowsHitTesting(false)
+                }
                 Color.clear
                     .allowsHitTesting(false)
 
@@ -466,7 +530,8 @@ private struct IslandView: View {
                 }
 
                 VStack(spacing: 0) {
-                    if session.islandAttachment == .notchAttached {
+                    if session.islandAttachment == .notchAttached,
+                       expansionState == .expanded {
                         Color.clear
                             .frame(height: notchClearance)
                             .allowsHitTesting(false)
@@ -477,18 +542,29 @@ private struct IslandView: View {
                                 attachment: session.islandAttachment,
                                 expansionState: expansionState
                             ) {
-                                compactContent
-                                    .opacity(expansionState == .expanded ? 0 : 1)
+                                Group {
+                                    if wingOnlyCompact {
+                                        wingOnlyCompactContent
+                                    } else {
+                                        compactContent
+                                    }
+                                }
+                                .opacity(expansionState == .expanded ? 0 : 1)
                             }
                             content
                                 .opacity(revealExpandedContent ? 1 : 0)
                                 .allowsHitTesting(expansionState == .expanded && revealExpandedContent)
+                                .environment(\.colorScheme, .dark)
                         }
                     }
                     .frame(maxHeight: .infinity)
                 }
+                // The body is narrower than the surface by the shoulder inset,
+                // so content has to clear that too or the clip path cuts into
+                // it. Using the target inset rather than the interpolated one
+                // keeps this off the per-frame path.
+                .padding(.horizontal, wingOnlyCompact ? 0 : 16 + CGFloat(geometry.shoulderInset))
             }
-            .padding(.horizontal, 16)
         }
         .onHover { updateHover($0) }
     }
@@ -512,6 +588,52 @@ private struct IslandView: View {
             }
         case .idle:
             idleContent
+        }
+    }
+
+    private var wingOnlyCompactContent: some View {
+        HStack(spacing: 0) {
+            compactWingIcon(for: presentation)
+                .frame(width: 40, height: geometry.height)
+            Spacer(minLength: CGFloat(session.islandHardwareNotchWidth))
+            Image(systemName: "chevron.down")
+                .font(.system(size: 16, weight: .semibold))
+                .frame(width: 40, height: geometry.height)
+                .contentShape(Rectangle())
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .foregroundStyle(.white)
+        .opacity(wingIconsRevealed ? 1 : 0)
+    }
+
+    /// The wings are laid out against the surface's current width, so revealing
+    /// them mid-contraction puts them where the surface used to be and lets the
+    /// shrinking clip path cut into them. Waiting for the morph to settle is
+    /// also how Droppy sequences it: contract first, then show the wings.
+    private func revealWingsAfterContraction() async {
+        guard !wingIconsRevealed else { return }
+        guard !reduceMotion else {
+            wingIconsRevealed = true
+            return
+        }
+        let policy = coordinator.motion(
+            reduceMotion: reduceMotion,
+            materialMotionEnabled: session.glassMotionEnabled
+        )
+        try? await Task.sleep(nanoseconds: UInt64(policy.collapseDuration * 1_000_000_000))
+        guard !Task.isCancelled, expansionState != .expanded else { return }
+        withAnimation(.easeOut(duration: 0.14)) { wingIconsRevealed = true }
+    }
+
+    @ViewBuilder
+    private func compactWingIcon(for presentation: IslandPresentation) -> some View {
+        switch presentation {
+        case .music:
+            Image(systemName: "music.note")
+        case .meeting:
+            Image(systemName: "calendar.badge.clock")
+        case .idle:
+            Image(systemName: "music.note")
         }
     }
 
@@ -631,11 +753,26 @@ private struct IslandView: View {
     }
 
     private var presentation: IslandPresentation { session.islandPresentation }
+    private var islandContentRevision: String {
+        [
+            expansionState.rawValue,
+            revealExpandedContent ? "revealed" : "hidden",
+            wingIconsRevealed ? "wings" : "noWings",
+            String(describing: presentation),
+            session.currentTrackTitle,
+            session.playback.currentItem?.artist ?? "",
+            String(describing: session.playback.phase),
+            primaryText,
+            secondaryText,
+            String(Int(progress * 100))
+        ].joined(separator: "|")
+    }
     private var geometry: IslandSurfaceGeometry {
         coordinator.geometry(
             for: presentation,
             attachment: session.islandAttachment,
-            expansionState: expansionState
+            expansionState: expansionState,
+            collapsedReferenceHeight: session.islandCollapsedReferenceHeight
         )
     }
     private var resolvedWidth: CGFloat {
@@ -650,10 +787,13 @@ private struct IslandView: View {
         ))
     }
     private var notchClearance: CGFloat {
-        min(
-            CGFloat(geometry.height),
-            CGFloat(session.islandDisplayGeometry?.hardwareNotchHeight ?? 0)
-        )
+        CGFloat(session.islandDisplayGeometry?.hardwareNotchHeight ?? 0)
+    }
+    /// Raises the shade's opaque band when the status bar reaches past the
+    /// coordinator's default. A floating capsule hangs below the menu bar and
+    /// overlaps nothing, so it just takes the default band.
+    private var statusBarBandHeight: CGFloat {
+        session.islandAttachment == .notchAttached ? notchClearance : 0
     }
     private var containerAnimation: Animation? {
         animation(for: expansionState)
@@ -724,22 +864,35 @@ private struct IslandSurfaceMorph<Content: View>: View, @preconcurrency Animatab
     var height: CGFloat
     var topRadius: CGFloat
     var bottomRadius: CGFloat
+    var shoulderInset: CGFloat
     let reduceTransparency: Bool
     let activeAppearanceOverrideAvailable: Bool
+    let shadowEnabled: Bool
+    /// The expanded surface supplies its own shade, so it clears the frosted
+    /// backing to keep its bottom edge pure Liquid Glass.
+    let backingLevelOverride: GlassBackingLevel?
+    let contentRevision: String
     let content: () -> Content
 
-    var animatableData: AnimatablePair<CGFloat, AnimatablePair<CGFloat, AnimatablePair<CGFloat, CGFloat>>> {
+    var animatableData: AnimatablePair<
+        CGFloat,
+        AnimatablePair<CGFloat, AnimatablePair<CGFloat, AnimatablePair<CGFloat, CGFloat>>>
+    > {
         get {
             AnimatablePair(
                 width,
-                AnimatablePair(height, AnimatablePair(topRadius, bottomRadius))
+                AnimatablePair(
+                    height,
+                    AnimatablePair(topRadius, AnimatablePair(bottomRadius, shoulderInset))
+                )
             )
         }
         set {
             width = newValue.first
             height = newValue.second.first
             topRadius = newValue.second.second.first
-            bottomRadius = newValue.second.second.second
+            bottomRadius = newValue.second.second.second.first
+            shoulderInset = newValue.second.second.second.second
         }
     }
 
@@ -747,12 +900,14 @@ private struct IslandSurfaceMorph<Content: View>: View, @preconcurrency Animatab
         let path = LiquidGlassSurfacePath(
             attachment: attachment,
             topRadius: topRadius,
-            bottomRadius: bottomRadius
+            bottomRadius: bottomRadius,
+            shoulderInset: shoulderInset
         )
         let shape = IslandContinuousShape(
             attachment: attachment,
             topRadius: topRadius,
-            bottomRadius: bottomRadius
+            bottomRadius: bottomRadius,
+            shoulderInset: shoulderInset
         )
         return LiquidGlassSurfaceContainer(
             session: session,
@@ -761,6 +916,8 @@ private struct IslandSurfaceMorph<Content: View>: View, @preconcurrency Animatab
             backdropSource: .behindWindow,
             reduceTransparency: reduceTransparency,
             activeAppearanceOverrideAvailable: activeAppearanceOverrideAvailable,
+            backingLevelOverride: backingLevelOverride,
+            contentRevision: contentRevision,
             content: content
         )
         .frame(width: width, height: height)
@@ -769,7 +926,39 @@ private struct IslandSurfaceMorph<Content: View>: View, @preconcurrency Animatab
             shape.stroke(.white.opacity(reduceTransparency ? 0.18 : 0.12), lineWidth: 0.55)
         }
         .contentShape(shape)
-        .shadow(color: .black.opacity(attachment == .notchAttached ? 0.18 : 0.24), radius: 18, y: 8)
+        .shadow(
+            color: shadowEnabled ? .black.opacity(attachment == .notchAttached ? 0.18 : 0.24) : .clear,
+            radius: shadowEnabled ? 18 : 0,
+            y: shadowEnabled ? 8 : 0
+        )
+    }
+}
+
+/// Reads the live surface height so the opaque band keeps its measured
+/// status-bar height through the morph, instead of scaling with it.
+private struct IslandShadeLayer: View {
+    let coordinator: IslandCoordinator
+    let statusBarHeight: CGFloat
+    let reduceTransparency: Bool
+
+    var body: some View {
+        GeometryReader { proxy in
+            let shade = coordinator.surfaceShade(
+                statusBarHeight: Double(statusBarHeight),
+                surfaceHeight: Double(proxy.size.height),
+                reduceTransparency: reduceTransparency
+            )
+            LinearGradient(
+                stops: shade.stops.map {
+                    Gradient.Stop(
+                        color: .black.opacity($0.opacity),
+                        location: CGFloat($0.location)
+                    )
+                },
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
     }
 }
 
@@ -783,12 +972,14 @@ private struct IslandContinuousShape: Shape {
     var attachment: IslandAttachment
     var topRadius: CGFloat
     var bottomRadius: CGFloat
+    var shoulderInset: CGFloat
 
-    var animatableData: AnimatablePair<CGFloat, CGFloat> {
-        get { AnimatablePair(topRadius, bottomRadius) }
+    var animatableData: AnimatablePair<CGFloat, AnimatablePair<CGFloat, CGFloat>> {
+        get { AnimatablePair(topRadius, AnimatablePair(bottomRadius, shoulderInset)) }
         set {
             topRadius = newValue.first
-            bottomRadius = newValue.second
+            bottomRadius = newValue.second.first
+            shoulderInset = newValue.second.second
         }
     }
 
@@ -796,7 +987,8 @@ private struct IslandContinuousShape: Shape {
         LiquidGlassSurfacePath(
             attachment: attachment,
             topRadius: topRadius,
-            bottomRadius: bottomRadius
+            bottomRadius: bottomRadius,
+            shoulderInset: shoulderInset
         )
         .path(in: rect)
     }

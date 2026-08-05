@@ -113,23 +113,55 @@ public struct IslandSurfaceGeometry: Equatable, Sendable {
     public let width: Double
     public let height: Double
     public let cornerRadius: Double
+    /// Corner radius for a floating capsule's top edge. A notch-attached
+    /// surface takes its top geometry from `shoulderInset` instead, since its
+    /// top edge is flush with the physical screen edge.
     public let topCornerRadius: Double
-    /// Additional width required around a hardware notch. Zero for a floating
-    /// capsule; the coordinator leaves the actual notch width to AppKit.
+    /// Additional width required around a hardware notch. The collapsed state
+    /// uses 80 points for its two 40-point icon wings; floating capsules use 0.
     public let notchSideInset: Double
+    /// How far each side of a notch-attached body pulls in from its full-width
+    /// top edge, forming the shoulder. Zero keeps the body full width. This is
+    /// interpolated across the morph, so the shoulder grows in continuously
+    /// rather than the silhouette switching shape partway through.
+    public let shoulderInset: Double
 
     public init(
         width: Double,
         height: Double,
         cornerRadius: Double,
         topCornerRadius: Double,
-        notchSideInset: Double = 0
+        notchSideInset: Double = 0,
+        shoulderInset: Double = 0
     ) {
         self.width = width
         self.height = height
         self.cornerRadius = cornerRadius
         self.topCornerRadius = topCornerRadius
         self.notchSideInset = notchSideInset
+        self.shoulderInset = shoulderInset
+    }
+}
+
+/// Vertical black ramp drawn over the expanded surface. The band that overlaps
+/// the system status bar stays fully opaque; the remainder falls to clear so the
+/// bottom edge of the surface is untinted Liquid Glass.
+public struct IslandSurfaceShade: Equatable, Sendable {
+    public struct Stop: Equatable, Sendable {
+        /// Fraction of the surface height, measured from its top edge.
+        public let location: Double
+        public let opacity: Double
+
+        public init(location: Double, opacity: Double) {
+            self.location = location
+            self.opacity = opacity
+        }
+    }
+
+    public let stops: [Stop]
+
+    public init(stops: [Stop]) {
+        self.stops = stops
     }
 }
 

@@ -36,6 +36,9 @@ final class AppSession {
     var preferredIslandDisplayID: String?
     var availableIslandDisplays: [IslandDisplay] = []
     var islandDisplayGeometry: IslandDisplayGeometry?
+    /// The reference height is session-scoped so a floating display keeps the
+    /// same collapsed rhythm as the last real hardware-notch geometry.
+    var islandCollapsedReferenceHeight: Double = 32
     var islandAttachment: IslandAttachment {
         islandDisplayGeometry?.attachment ?? .floatingCapsule
     }
@@ -592,6 +595,9 @@ final class AppSession {
     ) {
         availableIslandDisplays = displays
         islandDisplayGeometry = geometry
+        if geometry.hardwareNotchHeight > 0 {
+            islandCollapsedReferenceHeight = geometry.hardwareNotchHeight
+        }
     }
 
     func setIslandActiveAppearanceOverrideAvailable(_ available: Bool) {

@@ -1,6 +1,10 @@
 import LockTuneDomain
 
 public struct IslandCoordinator: Sendable {
+    /// Horizontal shoulder inset for an expanded notch-attached surface,
+    /// measured off Droppy 14.2.0.
+    public static let expandedShoulderInset = 20.0
+
     public init() {}
 
     public func presentation(for context: IslandContext) -> IslandPresentation {
@@ -23,17 +27,18 @@ public struct IslandCoordinator: Sendable {
     public func geometry(
         for presentation: IslandPresentation,
         attachment: IslandAttachment,
-        expansionState: IslandExpansionState
+        expansionState: IslandExpansionState,
+        collapsedReferenceHeight: Double = 32
     ) -> IslandSurfaceGeometry {
         let isNotched = attachment == .notchAttached
         switch expansionState {
         case .collapsed:
             return IslandSurfaceGeometry(
                 width: isNotched ? 0 : 196,
-                height: 42,
-                cornerRadius: isNotched ? 21 : 21,
-                topCornerRadius: isNotched ? 10 : 21,
-                notchSideInset: isNotched ? 20 : 0
+                height: max(1, collapsedReferenceHeight),
+                cornerRadius: isNotched ? min(10, max(1, collapsedReferenceHeight) / 2) : max(1, collapsedReferenceHeight) / 2,
+                topCornerRadius: isNotched ? 10 : max(1, collapsedReferenceHeight) / 2,
+                notchSideInset: isNotched ? 80 : 0
             )
         case .hovered:
             return IslandSurfaceGeometry(
@@ -54,9 +59,54 @@ public struct IslandCoordinator: Sendable {
                 height: 132,
                 cornerRadius: isNotched ? 26 : 32,
                 topCornerRadius: isNotched ? 12 : 32,
-                notchSideInset: isNotched ? 24 : 0
+                notchSideInset: isNotched ? 24 : 0,
+                // 20pt matches the horizontal inset measured off Droppy 14.2.0.
+                // Only the expanded surface carries a shoulder; the shorter
+                // states interpolate up to it from zero.
+                shoulderInset: isNotched ? Self.expandedShoulderInset : 0
             )
         }
+    }
+
+    /// Fraction of the surface held at full opacity before the ramp starts.
+    /// Measured from Droppy 14.2.0, whose shade stays pure black through the
+    /// top 60% of its 208pt panel. A surface shorter than the status bar's
+    /// share of it overrides this upward.
+    static let shadeSolidFraction = 0.60
+    /// Where the linear ramp reaches its floor. Past this the shade is flat.
+    static let shadeFloorStart = 0.92
+    /// The shade never reaches zero. This residual black is what gives the
+    /// bottom edge its weight; ramping to fully clear reads as washed out.
+    static let shadeFloorOpacity = 0.27
+
+    /// Vertical shade for a hovered or expanded surface, profiled off Droppy
+    /// 14.2.0: pure black through the top 60%, a linear fall to 0.27 by 92%,
+    /// then that floor held to the bottom edge. Glass refraction still shows
+    /// through the floor, so the bottom stays a lens rather than a painted
+    /// panel. The status-bar band stays opaque even when it reaches past 60%,
+    /// which is what keeps a short hovered surface seamless with the hardware
+    /// notch. Reduce Transparency keeps the shade opaque, as its backing is too.
+    public func surfaceShade(
+        statusBarHeight: Double,
+        surfaceHeight: Double,
+        reduceTransparency: Bool = false
+    ) -> IslandSurfaceShade {
+        let opaque = IslandSurfaceShade(stops: [
+            IslandSurfaceShade.Stop(location: 0, opacity: 1),
+            IslandSurfaceShade.Stop(location: 1, opacity: 1),
+        ])
+        guard !reduceTransparency, surfaceHeight > 0 else { return opaque }
+
+        let statusBarFraction = min(max(statusBarHeight, 0), surfaceHeight) / surfaceHeight
+        let solidEnd = min(max(Self.shadeSolidFraction, statusBarFraction), 1)
+        guard solidEnd < Self.shadeFloorStart else { return opaque }
+
+        return IslandSurfaceShade(stops: [
+            IslandSurfaceShade.Stop(location: 0, opacity: 1),
+            IslandSurfaceShade.Stop(location: solidEnd, opacity: 1),
+            IslandSurfaceShade.Stop(location: Self.shadeFloorStart, opacity: Self.shadeFloorOpacity),
+            IslandSurfaceShade.Stop(location: 1, opacity: Self.shadeFloorOpacity),
+        ])
     }
 
     public func floatingTopGap(menuBarHeight: Double) -> Double {
@@ -110,14 +160,14 @@ public struct IslandCoordinator: Sendable {
         )
     }
 
-    /// The hardware notch consumes the top portion of the collapsed and
-    /// hovered surface. Text in that narrow remainder is not readable, so
-    /// compact copy is reserved for floating capsules and expanded panels.
+    /// Compact content remains present for notched displays. The view chooses
+    /// the wing-only icon layout for collapsed/hovered states so the physical
+    /// notch is never covered by text while the two wings remain interactive.
     public func showsCompactContent(
         attachment: IslandAttachment,
-        expansionState: IslandExpansionState
+        expansionState _: IslandExpansionState
     ) -> Bool {
-        attachment != .notchAttached || expansionState == .expanded
+        true
     }
 
     public func resolveDisplay(

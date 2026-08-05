@@ -178,9 +178,19 @@ final class LiquidGlassAuroraView: NSView {
 /// material layer. SwiftUI owns the canonical (y-down) path; AppKit receives
 /// the vertically flipped equivalent for its layer mask.
 struct LiquidGlassSurfacePath: Equatable {
+    /// Droppy's shoulder drops about 1.3x further than it insets, which reads as
+    /// a longer, calmer bend than a symmetric quarter-round would.
+    static let shoulderDropRatio: CGFloat = 1.3
+    /// Control-point ratio that makes a cubic approximate a quarter-arc.
+    static let arcKappa: CGFloat = 0.5522847498
+
     let attachment: IslandAttachment
     let topRadius: CGFloat
     let bottomRadius: CGFloat
+    /// How far each side of the body pulls in from the full-width top edge.
+    /// Interpolating this across the morph is what keeps the silhouette from
+    /// jumping: at zero the body runs full width, and the shoulder grows in.
+    var shoulderInset: CGFloat = 0
 
     func path(in rect: CGRect) -> Path {
         let width = max(0, rect.width)
@@ -202,38 +212,52 @@ struct LiquidGlassSurfacePath: Equatable {
             .path(in: rect)
         }
 
-        // A notched Island continues above the physical screen edge. The
-        // short cubic shoulders therefore enter the visible top edge from
-        // outside the local bounds instead of forming a second, inset shape.
-        let shoulderDepth = max(1, top * 0.7)
-        let shoulderEndY = min(height - bottom, max(top * 0.78, 1))
-        let kappa = 0.5522847498
+        return notchPath(width: width, height: height)
+    }
+
+    /// A notch-attached top edge always spans the full width flush with the
+    /// physical screen edge, so the silhouette meets the hardware without a
+    /// seam and square top corners are deliberate. `shoulderInset` pulls the
+    /// body in from that edge; the quadratic control points sit on the corners,
+    /// matching Droppy's shoulder construction.
+    private func notchPath(width: CGFloat, height: CGFloat) -> Path {
+        let inset = min(max(0, shoulderInset), width / 2)
+        let bodyWidth = width - inset * 2
+        let corner = min(max(0, bottomRadius), min(bodyWidth / 2, height / 2))
+        let drop = min(inset * Self.shoulderDropRatio, max(0, height - corner))
+        let bodyBottom = max(drop, height - corner)
+
         var path = Path()
-        path.move(to: CGPoint(x: top, y: -shoulderDepth))
-        path.addLine(to: CGPoint(x: width - top, y: -shoulderDepth))
-        path.addCurve(
-            to: CGPoint(x: width, y: shoulderEndY),
-            control1: CGPoint(x: width - top * 0.24, y: -shoulderDepth),
-            control2: CGPoint(x: width, y: shoulderEndY * 0.14)
+        path.move(to: CGPoint(x: 0, y: 0))
+        if inset > 0 {
+            // A cubic approximation of an elliptical quarter-arc. A quadratic
+            // with its control point on the corner converges horizontally far
+            // too early — the edge reads as vertical about halfway down — so
+            // the bend would never carry to `drop` the way Droppy's does.
+            path.addCurve(
+                to: CGPoint(x: inset, y: drop),
+                control1: CGPoint(x: inset * Self.arcKappa, y: 0),
+                control2: CGPoint(x: inset, y: drop * (1 - Self.arcKappa))
+            )
+        }
+        path.addLine(to: CGPoint(x: inset, y: bodyBottom))
+        path.addQuadCurve(
+            to: CGPoint(x: inset + corner, y: height),
+            control: CGPoint(x: inset, y: height)
         )
-        path.addLine(to: CGPoint(x: width, y: height - bottom))
-        path.addCurve(
-            to: CGPoint(x: width - bottom, y: height),
-            control1: CGPoint(x: width, y: height - bottom + bottom * kappa),
-            control2: CGPoint(x: width - bottom + bottom * kappa, y: height)
+        path.addLine(to: CGPoint(x: width - inset - corner, y: height))
+        path.addQuadCurve(
+            to: CGPoint(x: width - inset, y: bodyBottom),
+            control: CGPoint(x: width - inset, y: height)
         )
-        path.addLine(to: CGPoint(x: bottom, y: height))
-        path.addCurve(
-            to: CGPoint(x: 0, y: height - bottom),
-            control1: CGPoint(x: bottom - bottom * kappa, y: height),
-            control2: CGPoint(x: 0, y: height - bottom + bottom * kappa)
-        )
-        path.addLine(to: CGPoint(x: 0, y: shoulderEndY))
-        path.addCurve(
-            to: CGPoint(x: top, y: -shoulderDepth),
-            control1: CGPoint(x: 0, y: shoulderEndY * 0.14),
-            control2: CGPoint(x: top * 0.24, y: -shoulderDepth)
-        )
+        path.addLine(to: CGPoint(x: width - inset, y: drop))
+        if inset > 0 {
+            path.addCurve(
+                to: CGPoint(x: width, y: 0),
+                control1: CGPoint(x: width - inset, y: drop * (1 - Self.arcKappa)),
+                control2: CGPoint(x: width - inset * Self.arcKappa, y: 0)
+            )
+        }
         path.closeSubpath()
         return path
     }
@@ -259,6 +283,8 @@ final class LiquidGlassSurfaceHost: NSView {
     private var cornerRadius: CGFloat
     private var surfacePath: LiquidGlassSurfacePath?
     private var activeAppearanceOverrideAvailable: Bool
+    private var hasAppliedConfiguration = false
+    var contentRevision: String?
 
     init(
         configuration: LiquidGlassConfiguration,
@@ -266,6 +292,7 @@ final class LiquidGlassSurfaceHost: NSView {
         cornerRadius: CGFloat = 30,
         surfacePath: LiquidGlassSurfacePath? = nil,
         activeAppearanceOverrideAvailable: Bool = false,
+        contentRevision: String? = nil,
         contentView: NSView? = nil
     ) {
         self.configuration = configuration
@@ -273,6 +300,7 @@ final class LiquidGlassSurfaceHost: NSView {
         self.cornerRadius = cornerRadius
         self.surfacePath = surfacePath
         self.activeAppearanceOverrideAvailable = activeAppearanceOverrideAvailable
+        self.contentRevision = contentRevision
         super.init(frame: .zero)
         wantsLayer = true
         layer?.masksToBounds = true
@@ -297,33 +325,46 @@ final class LiquidGlassSurfaceHost: NSView {
         surfacePath: LiquidGlassSurfacePath? = nil,
         activeAppearanceOverrideAvailable: Bool? = nil
     ) {
+        let nextActiveAppearanceOverrideAvailable = activeAppearanceOverrideAvailable
+            ?? self.activeAppearanceOverrideAvailable
+        let appearanceChanged = !hasAppliedConfiguration
+            || self.configuration != configuration
+            || self.activeAppearanceOverrideAvailable != nextActiveAppearanceOverrideAvailable
+            || (configuration.reduceTransparency ? glassView != nil : glassView == nil)
+
         self.configuration = configuration
         if let cornerRadius { self.cornerRadius = cornerRadius }
         self.surfacePath = surfacePath
-        if let activeAppearanceOverrideAvailable {
-            self.activeAppearanceOverrideAvailable = activeAppearanceOverrideAvailable
-        }
+        self.activeAppearanceOverrideAvailable = nextActiveAppearanceOverrideAvailable
         applySurfaceGeometry()
 
-        backingView.material = .menu
-        backingView.blendingMode = backdropSource == .behindWindow ? .behindWindow : .withinWindow
-        backingView.state = .active
-        backingView.isEmphasized = false
-        backingView.alphaValue = configuration.reduceTransparency ? 1 : configuration.backingAlpha
-        backingView.wantsLayer = true
         applyChildGeometry(to: backingView)
 
-        if configuration.reduceTransparency {
-            replaceGlassView(nil)
-            backingView.material = .contentBackground
-            backingView.alphaValue = 1
-            backingView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
-            runtimeMode = .opaqueAccessibilityFallback
-            capabilities = LiquidGlassCapabilities(runtimeMode: runtimeMode)
-        } else {
-            backingView.layer?.backgroundColor = nil
-            ensureGlassView()
-            configureGlassView()
+        // Geometry changes every animation frame, but material setup and the
+        // private selector dispatch do not. Repeating those AppKit operations
+        // during a 0.38s morph made clicks feel delayed, especially when the
+        // native glass view was rebuilding its internal layers.
+        if appearanceChanged {
+            backingView.material = .menu
+            backingView.blendingMode = backdropSource == .behindWindow ? .behindWindow : .withinWindow
+            backingView.state = .active
+            backingView.isEmphasized = false
+            backingView.alphaValue = configuration.reduceTransparency ? 1 : configuration.backingAlpha
+            backingView.wantsLayer = true
+
+            if configuration.reduceTransparency {
+                replaceGlassView(nil)
+                backingView.material = .contentBackground
+                backingView.alphaValue = 1
+                backingView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+                runtimeMode = .opaqueAccessibilityFallback
+                capabilities = LiquidGlassCapabilities(runtimeMode: runtimeMode)
+            } else {
+                backingView.layer?.backgroundColor = nil
+                ensureGlassView()
+                configureGlassView()
+            }
+            hasAppliedConfiguration = true
         }
         needsLayout = true
     }
@@ -413,12 +454,16 @@ struct LiquidGlassSurfaceContainer<Content: View>: NSViewRepresentable {
     var backdropSource: LiquidGlassBackdropSource = .behindWindow
     var reduceTransparency = false
     var activeAppearanceOverrideAvailable = false
+    /// Replaces the session's frosted backing level for surfaces that draw
+    /// their own shade and need the untouched glass underneath it.
+    var backingLevelOverride: GlassBackingLevel? = nil
+    var contentRevision: String? = nil
     let content: () -> Content
 
     private var configuration: LiquidGlassConfiguration {
         return LiquidGlassConfiguration(
             tint: session.glassTint,
-            backingLevel: session.glassBackingLevel,
+            backingLevel: backingLevelOverride ?? session.glassBackingLevel,
             lensing: session.glassRefraction,
             reduceTransparency: reduceTransparency,
             privateRefractionEnabled: session.privateRefractionEnabled
@@ -433,6 +478,7 @@ struct LiquidGlassSurfaceContainer<Content: View>: NSViewRepresentable {
             cornerRadius: cornerRadius,
             surfacePath: surfacePath,
             activeAppearanceOverrideAvailable: activeAppearanceOverrideAvailable,
+            contentRevision: contentRevision,
             contentView: contentView
         )
         publishRuntimeMode(host.runtimeMode)
@@ -447,8 +493,16 @@ struct LiquidGlassSurfaceContainer<Content: View>: NSViewRepresentable {
             activeAppearanceOverrideAvailable: activeAppearanceOverrideAvailable
         )
         if let contentView = host.hostedContentView as? NSHostingView<Content> {
-            contentView.rootView = content()
+            // Animatable surface geometry updates this representable every
+            // frame. Rebuilding the entire hosted SwiftUI tree on those same
+            // frames was the remaining source of visible click hitching.
+            // Callers with a revision get an update only when their content
+            // state changes; legacy surfaces without one retain live updates.
+            if contentRevision == nil || host.contentRevision != contentRevision {
+                contentView.rootView = content()
+            }
         }
+        host.contentRevision = contentRevision
         publishRuntimeMode(host.runtimeMode)
     }
 
