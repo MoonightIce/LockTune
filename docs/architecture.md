@@ -121,3 +121,20 @@ The application targets macOS 14 and both arm64 and x86_64. App Sandbox is
 enabled from the start. Preview GitHub releases may be ad-hoc signed but are not
 notarized. Automated updates and stable distribution signing are deferred until
 a paid Apple Developer account is available.
+
+## IslandPresentation Liquid Glass experiment
+
+The supported product behavior remains based on public macOS APIs. The
+`IslandPresentation` Liquid Glass refraction experiment is an explicit,
+isolated exception: on macOS 26 and later it may probe and dispatch the
+undocumented `NSGlassEffectView` variant/lensing setters and install active
+appearance overrides on the `IslandPanel` subclass only. No other window,
+feature module, persistence path, or permission boundary may depend on these
+selectors.
+
+Runtime diagnostics must distinguish `complete private refraction` from
+`public glass fallback` and `opaque accessibility fallback`. Missing selectors
+are observable capability mismatches, not a successful full-refraction result.
+The experiment is not App Store compatible by default; disabling private
+refraction must leave music, calendar, Island content, and window lifecycle
+usable through the public glass or older-system visual-effect fallback.
