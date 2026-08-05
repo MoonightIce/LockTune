@@ -207,7 +207,6 @@ private struct IslandView: View {
             session: session,
             cornerRadius: CGFloat(geometry.cornerRadius),
             backdropSource: .behindWindow,
-            reduceMotion: reduceMotion,
             reduceTransparency: reduceTransparency
         ) {
             VStack(spacing: 0) {

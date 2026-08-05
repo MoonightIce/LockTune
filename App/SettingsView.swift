@@ -178,14 +178,12 @@ struct SettingsView: View {
 
 private struct GlassLaboratoryView: View {
     @Bindable var session: AppSession
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             GlassLabPreview(
                 session: session,
-                reduceMotion: reduceMotion,
                 reduceTransparency: reduceTransparency
             )
                 .frame(height: 86)
@@ -293,7 +291,6 @@ private struct GlassLaboratoryView: View {
 
 private struct GlassLabPreview: View {
     @Bindable var session: AppSession
-    let reduceMotion: Bool
     let reduceTransparency: Bool
 
     var body: some View {
@@ -301,7 +298,6 @@ private struct GlassLabPreview: View {
             session: session,
             cornerRadius: 43,
             backdropSource: .withinWindow,
-            reduceMotion: reduceMotion,
             reduceTransparency: reduceTransparency
         ) {
             HStack(spacing: 10) {

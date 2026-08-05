@@ -105,8 +105,6 @@ public struct LiquidGlassConfiguration: Equatable, Sendable {
     public let lensing: Int
     public let scrim: Int
     public let subdued: Int
-    public let dynamicAurora: Bool
-    public let reduceMotion: Bool
     public let reduceTransparency: Bool
     public let privateRefractionEnabled: Bool
 
@@ -114,8 +112,6 @@ public struct LiquidGlassConfiguration: Equatable, Sendable {
         tint: Double,
         backingLevel: GlassBackingLevel,
         lensing: Double,
-        dynamicAurora: Bool = true,
-        reduceMotion: Bool = false,
         reduceTransparency: Bool = false,
         privateRefractionEnabled: Bool = true
     ) {
@@ -125,8 +121,6 @@ public struct LiquidGlassConfiguration: Equatable, Sendable {
         self.lensing = min(max(Int(lensing.rounded()), 0), 6)
         scrim = 0
         subdued = 0
-        self.dynamicAurora = dynamicAurora
-        self.reduceMotion = reduceMotion
         self.reduceTransparency = reduceTransparency
         self.privateRefractionEnabled = privateRefractionEnabled
     }

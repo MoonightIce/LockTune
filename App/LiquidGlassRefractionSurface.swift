@@ -300,7 +300,6 @@ struct LiquidGlassSurfaceContainer<Content: View>: NSViewRepresentable {
     @Bindable var session: AppSession
     let cornerRadius: CGFloat
     var backdropSource: LiquidGlassBackdropSource = .behindWindow
-    var reduceMotion = false
     var reduceTransparency = false
     let content: () -> Content
 
@@ -309,8 +308,6 @@ struct LiquidGlassSurfaceContainer<Content: View>: NSViewRepresentable {
             tint: session.glassTint,
             backingLevel: session.glassBackingLevel,
             lensing: session.glassRefraction,
-            dynamicAurora: session.glassMotionEnabled,
-            reduceMotion: reduceMotion,
             reduceTransparency: reduceTransparency,
             privateRefractionEnabled: session.privateRefractionEnabled
         )
