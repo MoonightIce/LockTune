@@ -28,9 +28,11 @@ final class AppSession {
     var currentArtworkData: Data?
     var isIslandEnabled: Bool
     var glassTint: Double
-    var glassBlur: Double
+    var glassBackingLevel: GlassBackingLevel
     var glassRefraction: Double
     var glassMotionEnabled: Bool
+    var privateRefractionEnabled: Bool
+    var liquidGlassRuntimeMode: LiquidGlassRuntimeMode = .notEvaluated
     var lastMusicScan: Date? { musicLibrary.scanState.lastCompletedAt }
     var musicLibraryError: String?
     var musicLibraryNotice: String?
@@ -62,9 +64,31 @@ final class AppSession {
         let islandPreference = UserDefaults.standard.object(forKey: "island.enabled") as? Bool
         isIslandEnabled = islandPreference ?? true
         glassTint = UserDefaults.standard.object(forKey: "glass.tint") as? Double ?? 0.12
-        glassBlur = UserDefaults.standard.object(forKey: "glass.blur") as? Double ?? 4
-        glassRefraction = UserDefaults.standard.object(forKey: "glass.refraction") as? Double ?? 110
+        if let savedBackingLevel = UserDefaults.standard.object(forKey: "glass.backingLevel") as? Int {
+            glassBackingLevel = GlassBackingLevel(rawValue: savedBackingLevel) ?? .light
+        } else if let legacyBlur = UserDefaults.standard.object(forKey: "glass.blur") as? Double {
+            glassBackingLevel = GlassBackingLevel(migratingLegacyBlur: legacyBlur)
+        } else {
+            glassBackingLevel = .light
+        }
+        let persistedRefraction = UserDefaults.standard.object(forKey: "glass.refraction") as? Double
+        let migratedRefraction: Double
+        if let persistedRefraction {
+            migratedRefraction = min(max(
+                persistedRefraction > 6
+                    ? (persistedRefraction / 160 * 6).rounded()
+                    : persistedRefraction,
+                0
+            ), 6)
+            if persistedRefraction > 6 {
+                UserDefaults.standard.set(migratedRefraction, forKey: "glass.refraction")
+            }
+        } else {
+            migratedRefraction = 6
+        }
+        glassRefraction = migratedRefraction
         glassMotionEnabled = UserDefaults.standard.object(forKey: "glass.motion") as? Bool ?? true
+        privateRefractionEnabled = UserDefaults.standard.object(forKey: "glass.privateRefractionEnabled") as? Bool ?? true
         let clientID = Bundle.main.object(forInfoDictionaryKey: "LockTuneGoogleClientID") as? String ?? ""
         let clientSecret = Bundle.main.object(forInfoDictionaryKey: "LockTuneGoogleClientSecret") as? String ?? ""
         let oauthConfiguration = GoogleOAuthConfiguration(clientID: clientID, clientSecret: clientSecret)
@@ -545,19 +569,29 @@ final class AppSession {
         UserDefaults.standard.set(value, forKey: "glass.tint")
     }
 
-    func setGlassBlur(_ value: Double) {
-        glassBlur = value
-        UserDefaults.standard.set(value, forKey: "glass.blur")
+    func setGlassBackingLevel(_ level: GlassBackingLevel) {
+        glassBackingLevel = level
+        UserDefaults.standard.set(level.rawValue, forKey: "glass.backingLevel")
     }
 
     func setGlassRefraction(_ value: Double) {
-        glassRefraction = value
-        UserDefaults.standard.set(value, forKey: "glass.refraction")
+        glassRefraction = min(max(value.rounded(), 0), 6)
+        UserDefaults.standard.set(glassRefraction, forKey: "glass.refraction")
     }
 
     func setGlassMotionEnabled(_ enabled: Bool) {
         glassMotionEnabled = enabled
         UserDefaults.standard.set(enabled, forKey: "glass.motion")
+    }
+
+    func setPrivateRefractionEnabled(_ enabled: Bool) {
+        privateRefractionEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "glass.privateRefractionEnabled")
+    }
+
+    func setLiquidGlassRuntimeMode(_ mode: LiquidGlassRuntimeMode) {
+        guard liquidGlassRuntimeMode != mode else { return }
+        liquidGlassRuntimeMode = mode
     }
 
     func resumeAfterWake() async {
