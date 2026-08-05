@@ -320,7 +320,9 @@ private final class IslandPanel: NSPanel {
         // A nonactivating status-bar panel does not reliably deliver SwiftUI's
         // gesture recognizer. Bridge only the initial pointer down; the view
         // decides whether this is an expand or collapse transition.
-        if event.type == .leftMouseDown {
+        if event.type == .leftMouseDown,
+           let contentView,
+           contentView.hitTest(contentView.convert(event.locationInWindow, from: nil)) != nil {
             NotificationCenter.default.post(
                 name: .lockTuneIslandPointerDown,
                 object: nil
@@ -332,6 +334,26 @@ private final class IslandPanel: NSPanel {
 
 private final class IslandContentHostingView: NSHostingView<IslandView> {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        // The panel reserves the maximum expanded height so the surface can
+        // morph downward from a stable top anchor. Its transparent reserve
+        // must not intercept clicks intended for the main window underneath.
+        guard let surfaceHost = findSurfaceHost(in: self) else {
+            return super.hitTest(point)
+        }
+        let surfaceFrame = surfaceHost.convert(surfaceHost.bounds, to: self)
+        guard surfaceFrame.contains(point) else { return nil }
+        return super.hitTest(point)
+    }
+
+    private func findSurfaceHost(in view: NSView) -> LiquidGlassSurfaceHost? {
+        if let host = view as? LiquidGlassSurfaceHost { return host }
+        for child in view.subviews {
+            if let host = findSurfaceHost(in: child) { return host }
+        }
+        return nil
+    }
 }
 
 extension NSScreen {
