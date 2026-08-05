@@ -67,13 +67,13 @@ final class AppSession {
     init() {
         let islandPreference = UserDefaults.standard.object(forKey: "island.enabled") as? Bool
         isIslandEnabled = islandPreference ?? true
-        glassTint = UserDefaults.standard.object(forKey: "glass.tint") as? Double ?? 0.12
+        glassTint = UserDefaults.standard.object(forKey: "glass.tint") as? Double ?? 0
         if let savedBackingLevel = UserDefaults.standard.object(forKey: "glass.backingLevel") as? Int {
             glassBackingLevel = GlassBackingLevel(rawValue: savedBackingLevel) ?? .light
         } else if let legacyBlur = UserDefaults.standard.object(forKey: "glass.blur") as? Double {
             glassBackingLevel = GlassBackingLevel(migratingLegacyBlur: legacyBlur)
         } else {
-            glassBackingLevel = .light
+            glassBackingLevel = .clear
         }
         let persistedRefraction = UserDefaults.standard.object(forKey: "glass.refraction") as? Double
         let migratedRefraction: Double

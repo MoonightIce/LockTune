@@ -36,29 +36,6 @@ struct LiquidGlassActiveAppearanceCapabilities: Equatable, Sendable {
     var allSelectorsInstalled: Bool { selectorsInstalled.values.allSatisfy { $0 } }
 }
 
-enum LiquidGlassDebugFixture {
-    #if DEBUG
-    static var enabled: Bool {
-        ProcessInfo.processInfo.arguments.contains("--locktune-glass-fixture")
-    }
-
-    static var noGlass: Bool {
-        enabled && ProcessInfo.processInfo.arguments.contains("--locktune-glass-no-glass")
-    }
-
-    static var lensingOverride: Double? {
-        guard enabled else { return nil }
-        let prefix = "--locktune-glass-lensing="
-        guard let argument = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix(prefix) }) else { return nil }
-        return Double(argument.dropFirst(prefix.count)).map { min(max($0.rounded(), 0), 6) }
-    }
-    #else
-    static let enabled = false
-    static let noGlass = false
-    static let lensingOverride: Double? = nil
-    #endif
-}
-
 @MainActor
 enum LiquidGlassRuntimeAdapter {
     private static var didReportCapabilities = false
@@ -189,105 +166,11 @@ enum LiquidGlassRuntimeAdapter {
 
 @MainActor
 final class LiquidGlassAuroraView: NSView {
-    var animates = true {
-        didSet {
-            if animates { startAnimationIfNeeded() } else { stopAnimation() }
-            needsDisplay = true
-        }
-    }
-
-    var fixtureEnabled = false {
-        didSet { needsDisplay = true }
-    }
-
-    private var phase: CGFloat = 0
-    private var timer: Timer?
-
     override var isOpaque: Bool { false }
 
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        if animates { startAnimationIfNeeded() }
-    }
-
-    override func removeFromSuperview() {
-        stopAnimation()
-        super.removeFromSuperview()
-    }
-
     override func draw(_ dirtyRect: NSRect) {
-        guard let context = NSGraphicsContext.current?.cgContext else { return }
-        let bounds = self.bounds
-        context.saveGState()
-        defer { context.restoreGState() }
-
-        if fixtureEnabled {
-            drawFixture(in: context, bounds: bounds)
-            return
-        }
-
-        let background = NSColor(calibratedWhite: 0.08, alpha: 0.18).cgColor
-        context.setFillColor(background)
-        context.fill(bounds)
-
-        drawRadial(in: context, bounds: bounds, center: CGPoint(x: bounds.width * 0.18, y: bounds.height * 0.68), radius: bounds.width * 0.72, color: NSColor.systemBlue.withAlphaComponent(0.34).cgColor)
-        drawRadial(in: context, bounds: bounds, center: CGPoint(x: bounds.width * 0.78, y: bounds.height * 0.24), radius: bounds.width * 0.68, color: NSColor.systemPurple.withAlphaComponent(0.28).cgColor)
-
-        let waveHeight = bounds.height * 0.18
-        let wave = CGMutablePath()
-        wave.move(to: CGPoint(x: -20, y: bounds.height * 0.45))
-        for x in stride(from: -20.0, through: bounds.width + 20, by: 4) {
-            let y = bounds.height * 0.45 + sin((x / max(bounds.width, 1)) * 5 + phase) * waveHeight
-            wave.addLine(to: CGPoint(x: x, y: y))
-        }
-        wave.addLine(to: CGPoint(x: bounds.width + 20, y: -20))
-        wave.addLine(to: CGPoint(x: -20, y: -20))
-        wave.closeSubpath()
-        context.addPath(wave)
-        context.setFillColor(NSColor.systemTeal.withAlphaComponent(0.2).cgColor)
-        context.fillPath()
-    }
-
-    private func drawRadial(in context: CGContext, bounds: CGRect, center: CGPoint, radius: CGFloat, color: CGColor) {
-        let colors = [color, color.copy(alpha: 0) ?? color] as CFArray
-        let locations: [CGFloat] = [0, 1]
-        guard let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: locations) else { return }
-        context.drawRadialGradient(gradient, startCenter: center, startRadius: 0, endCenter: center, endRadius: radius, options: [])
-    }
-
-    private func drawFixture(in context: CGContext, bounds: CGRect) {
-        let stripeWidth = max(bounds.width / 11, 1)
-        for index in 0..<12 {
-            let rect = CGRect(x: CGFloat(index) * stripeWidth, y: 0, width: stripeWidth, height: bounds.height)
-            let color: NSColor = index.isMultiple(of: 2) ? .systemOrange : .systemBlue
-            context.setFillColor(color.withAlphaComponent(0.75).cgColor)
-            context.fill(rect)
-        }
-        let checkerSize = max(min(bounds.width, bounds.height) / 5, 1)
-        for row in 0..<5 {
-            for column in 0..<12 {
-                if (row + column).isMultiple(of: 2) {
-                    context.setFillColor(NSColor.white.withAlphaComponent(0.55).cgColor)
-                    context.fill(CGRect(x: CGFloat(column) * checkerSize, y: CGFloat(row) * checkerSize, width: checkerSize, height: checkerSize))
-                }
-            }
-        }
-    }
-
-    private func startAnimationIfNeeded() {
-        guard timer == nil, window != nil else { return }
-        timer = Timer.scheduledTimer(withTimeInterval: 1 / 30, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self, self.animates else { return }
-                self.phase += 0.06
-                self.needsDisplay = true
-            }
-        }
-    }
-
-    private func stopAnimation() {
-        timer?.invalidate()
-        timer = nil
+        // Keep the Aurora layer in the native host, but leave it fully clear.
+        // All color and backdrop sampling comes from the system glass path.
     }
 }
 
@@ -303,19 +186,16 @@ final class LiquidGlassSurfaceHost: NSView {
     private var configuration: LiquidGlassConfiguration
     private let backdropSource: LiquidGlassBackdropSource
     private var cornerRadius: CGFloat
-    private var fixtureNoGlass: Bool
 
     init(
         configuration: LiquidGlassConfiguration,
         backdropSource: LiquidGlassBackdropSource = .behindWindow,
         cornerRadius: CGFloat = 30,
-        fixtureNoGlass: Bool = false,
         contentView: NSView? = nil
     ) {
         self.configuration = configuration
         self.backdropSource = backdropSource
         self.cornerRadius = cornerRadius
-        self.fixtureNoGlass = fixtureNoGlass
         super.init(frame: .zero)
         wantsLayer = true
         layer?.masksToBounds = true
@@ -336,17 +216,14 @@ final class LiquidGlassSurfaceHost: NSView {
 
     func update(
         configuration: LiquidGlassConfiguration,
-        cornerRadius: CGFloat? = nil,
-        fixtureNoGlass: Bool? = nil
+        cornerRadius: CGFloat? = nil
     ) {
         self.configuration = configuration
         if let cornerRadius { self.cornerRadius = cornerRadius }
-        if let fixtureNoGlass { self.fixtureNoGlass = fixtureNoGlass }
         layer?.cornerRadius = max(0, self.cornerRadius)
         layer?.cornerCurve = .continuous
         layer?.masksToBounds = true
 
-        auroraView.animates = configuration.dynamicAurora && !configuration.reduceMotion && !configuration.reduceTransparency
         backingView.material = .menu
         backingView.blendingMode = backdropSource == .behindWindow ? .behindWindow : .withinWindow
         backingView.state = .active
@@ -363,10 +240,6 @@ final class LiquidGlassSurfaceHost: NSView {
             backingView.alphaValue = 1
             backingView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
             runtimeMode = .opaqueAccessibilityFallback
-            capabilities = LiquidGlassCapabilities(runtimeMode: runtimeMode)
-        } else if fixtureNoGlass == true {
-            replaceGlassView(nil)
-            runtimeMode = .publicGlassFallback
             capabilities = LiquidGlassCapabilities(runtimeMode: runtimeMode)
         } else {
             backingView.layer?.backgroundColor = nil
@@ -429,16 +302,14 @@ struct LiquidGlassSurfaceContainer<Content: View>: NSViewRepresentable {
     var backdropSource: LiquidGlassBackdropSource = .behindWindow
     var reduceMotion = false
     var reduceTransparency = false
-    var fixtureEnabled = false
     let content: () -> Content
 
     private var configuration: LiquidGlassConfiguration {
-        let fixture = fixtureEnabled || LiquidGlassDebugFixture.enabled
         return LiquidGlassConfiguration(
-            tint: fixture ? 0 : session.glassTint,
-            backingLevel: fixture ? .clear : session.glassBackingLevel,
-            lensing: fixture ? (LiquidGlassDebugFixture.lensingOverride ?? session.glassRefraction) : session.glassRefraction,
-            dynamicAurora: fixture ? false : session.glassMotionEnabled,
+            tint: session.glassTint,
+            backingLevel: session.glassBackingLevel,
+            lensing: session.glassRefraction,
+            dynamicAurora: session.glassMotionEnabled,
             reduceMotion: reduceMotion,
             reduceTransparency: reduceTransparency,
             privateRefractionEnabled: session.privateRefractionEnabled
@@ -451,10 +322,8 @@ struct LiquidGlassSurfaceContainer<Content: View>: NSViewRepresentable {
             configuration: configuration,
             backdropSource: backdropSource,
             cornerRadius: cornerRadius,
-            fixtureNoGlass: fixtureEnabled || LiquidGlassDebugFixture.noGlass,
             contentView: contentView
         )
-        host.auroraView.fixtureEnabled = fixtureEnabled || LiquidGlassDebugFixture.enabled
         session.setLiquidGlassRuntimeMode(host.runtimeMode)
         return host
     }
@@ -462,10 +331,8 @@ struct LiquidGlassSurfaceContainer<Content: View>: NSViewRepresentable {
     func updateNSView(_ host: LiquidGlassSurfaceHost, context: Context) {
         host.update(
             configuration: configuration,
-            cornerRadius: cornerRadius,
-            fixtureNoGlass: fixtureEnabled || LiquidGlassDebugFixture.noGlass
+            cornerRadius: cornerRadius
         )
-        host.auroraView.fixtureEnabled = fixtureEnabled || LiquidGlassDebugFixture.enabled
         if let contentView = host.hostedContentView as? NSHostingView<Content> {
             contentView.rootView = content()
         }
