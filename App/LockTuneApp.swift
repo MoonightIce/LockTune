@@ -18,6 +18,9 @@ struct LockTuneApp: App {
                 .onChange(of: session.isIslandEnabled) { _, enabled in
                     islandWindow.setEnabled(enabled)
                 }
+                .onChange(of: session.preferredIslandDisplayID) { _, _ in
+                    islandWindow.reposition()
+                }
                 .onReceive(
                     NSWorkspace.shared.notificationCenter.publisher(
                         for: NSWorkspace.didWakeNotification

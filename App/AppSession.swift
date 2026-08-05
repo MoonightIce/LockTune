@@ -33,6 +33,10 @@ final class AppSession {
     var glassMotionEnabled: Bool
     var privateRefractionEnabled: Bool
     var liquidGlassRuntimeMode: LiquidGlassRuntimeMode = .notEvaluated
+    var preferredIslandDisplayID: String?
+    var availableIslandDisplays: [IslandDisplay] = []
+    var islandAttachment: IslandAttachment = .floatingCapsule
+    var islandHardwareNotchWidth: Double = 0
     var lastMusicScan: Date? { musicLibrary.scanState.lastCompletedAt }
     var musicLibraryError: String?
     var musicLibraryNotice: String?
@@ -89,6 +93,7 @@ final class AppSession {
         glassRefraction = migratedRefraction
         glassMotionEnabled = UserDefaults.standard.object(forKey: "glass.motion") as? Bool ?? true
         privateRefractionEnabled = UserDefaults.standard.object(forKey: "glass.privateRefractionEnabled") as? Bool ?? true
+        preferredIslandDisplayID = UserDefaults.standard.string(forKey: "island.preferredDisplayID")
         let clientID = Bundle.main.object(forInfoDictionaryKey: "LockTuneGoogleClientID") as? String ?? ""
         let clientSecret = Bundle.main.object(forInfoDictionaryKey: "LockTuneGoogleClientSecret") as? String ?? ""
         let oauthConfiguration = GoogleOAuthConfiguration(clientID: clientID, clientSecret: clientSecret)
@@ -219,7 +224,7 @@ final class AppSession {
 
     var islandPresentation: IslandPresentation {
         islandCoordinator.presentation(for: IslandContext(
-            isMusicPlaying: playback.phase == .playing,
+            hasCurrentTrack: playback.currentItem != nil,
             minutesUntilMeeting: nextMeeting.map {
                 max(0, Int(ceil($0.start.timeIntervalSinceNow / 60)))
             }
@@ -562,6 +567,25 @@ final class AppSession {
     func setIslandEnabled(_ enabled: Bool) {
         isIslandEnabled = enabled
         UserDefaults.standard.set(enabled, forKey: "island.enabled")
+    }
+
+    func setPreferredIslandDisplayID(_ displayID: String?) {
+        preferredIslandDisplayID = displayID
+        if let displayID {
+            UserDefaults.standard.set(displayID, forKey: "island.preferredDisplayID")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "island.preferredDisplayID")
+        }
+    }
+
+    func updateIslandDisplayEnvironment(
+        displays: [IslandDisplay],
+        attachment: IslandAttachment,
+        hardwareNotchWidth: Double
+    ) {
+        availableIslandDisplays = displays
+        islandAttachment = attachment
+        islandHardwareNotchWidth = hardwareNotchWidth
     }
 
     func setGlassTint(_ value: Double) {

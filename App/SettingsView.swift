@@ -59,6 +59,23 @@ struct SettingsView: View {
                 Text("settings.islandDescription")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Picker(
+                    "settings.islandDisplay",
+                    selection: Binding(
+                        get: { session.preferredIslandDisplayID },
+                        set: { session.setPreferredIslandDisplayID($0) }
+                    )
+                ) {
+                    Text("settings.islandDisplayAutomatic").tag(String?.none)
+                    ForEach(session.availableIslandDisplays) { display in
+                        Label(
+                            display.name,
+                            systemImage: display.hasNotch ? "laptopcomputer" : "display"
+                        )
+                        .tag(Optional(display.id))
+                    }
+                }
+                .accessibilityIdentifier("island.displayPicker")
             }
             Section {
                 GlassLaboratoryView(session: session)

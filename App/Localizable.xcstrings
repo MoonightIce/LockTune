@@ -211,6 +211,12 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "会议即将开始" } }
       }
     },
+    "island.playbackProgress" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Playback progress" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "播放进度" } }
+      }
+    },
     "library.addFolder" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Add Music Folder" } },
@@ -673,16 +679,22 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "显示 LockTune 灵动岛" } }
       }
     },
+    "settings.islandDisplay" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Island display" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "灵动岛显示器" } }
+      }
+    },
+    "settings.islandDisplayAutomatic" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Automatic (current main display)" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "自动（当前主屏）" } }
+      }
+    },
     "settings.islandDescription" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Shows playback and imminent meetings at the top of the active display." } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在当前显示器顶部展示播放状态和即将开始的会议。" } }
-      }
-    },
-    "settings.glassBlur" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Background blur" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "背景模糊" } }
       }
     },
     "settings.glassBacking" : {

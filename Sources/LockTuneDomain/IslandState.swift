@@ -6,6 +6,35 @@ public enum IslandPresentation: Equatable, Sendable {
     case meeting
 }
 
+public enum IslandAttachment: String, Codable, Equatable, Sendable {
+    case notchAttached
+    case floatingCapsule
+}
+
+public struct IslandSurfaceGeometry: Equatable, Sendable {
+    public let width: Double
+    public let height: Double
+    public let cornerRadius: Double
+    public let topCornerRadius: Double
+
+    public init(width: Double, height: Double, cornerRadius: Double, topCornerRadius: Double) {
+        self.width = width
+        self.height = height
+        self.cornerRadius = cornerRadius
+        self.topCornerRadius = topCornerRadius
+    }
+}
+
+public struct IslandMotionPolicy: Equatable, Sendable {
+    public let transitionDuration: Double
+    public let animatesOpticalHighlight: Bool
+
+    public init(transitionDuration: Double, animatesOpticalHighlight: Bool) {
+        self.transitionDuration = transitionDuration
+        self.animatesOpticalHighlight = animatesOpticalHighlight
+    }
+}
+
 public enum GlassBackingLevel: Int, CaseIterable, Codable, Identifiable, Sendable {
     case clear = 0
     case light = 25
@@ -113,33 +142,27 @@ public struct LiquidGlassConfiguration: Equatable, Sendable {
     }
 }
 
-public struct GlassMaterialAppearance: Equatable, Sendable {
-    public static let dockVariant = 2
+public struct IslandDisplay: Equatable, Identifiable, Sendable {
+    public let id: String
+    public let name: String
+    public let hasNotch: Bool
 
-    public let tintOpacity: Double
-    public let refractionAmount: Double
-    public let backdropOpacity: Double
-    public let variant: Int
-    public let lensing: Int
-
-    public init(tint: Double, backingLevel: GlassBackingLevel, refraction: Double) {
-        tintOpacity = min(max(tint, 0), 0.3)
-        refractionAmount = min(max(refraction, 0), 6)
-        backdropOpacity = backingLevel.opacity
-        variant = Self.dockVariant
-        lensing = Int(refractionAmount.rounded())
+    public init(id: String, name: String, hasNotch: Bool) {
+        self.id = id
+        self.name = name
+        self.hasNotch = hasNotch
     }
 }
 
 public struct IslandContext: Equatable, Sendable {
-    public var isMusicPlaying: Bool
+    public var hasCurrentTrack: Bool
     public var minutesUntilMeeting: Int?
 
     public init(
-        isMusicPlaying: Bool,
+        hasCurrentTrack: Bool,
         minutesUntilMeeting: Int?
     ) {
-        self.isMusicPlaying = isMusicPlaying
+        self.hasCurrentTrack = hasCurrentTrack
         self.minutesUntilMeeting = minutesUntilMeeting
     }
 }

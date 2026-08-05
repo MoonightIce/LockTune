@@ -6,7 +6,7 @@ import Testing
 func imminentMeetingTakesPriorityOverNormalMusic() {
     let coordinator = IslandCoordinator()
     let context = IslandContext(
-        isMusicPlaying: true,
+        hasCurrentTrack: true,
         minutesUntilMeeting: 8
     )
 
@@ -17,7 +17,7 @@ func imminentMeetingTakesPriorityOverNormalMusic() {
 func normalMusicOwnsTheIslandWithoutImminentMeeting() {
     let coordinator = IslandCoordinator()
     let context = IslandContext(
-        isMusicPlaying: true,
+        hasCurrentTrack: true,
         minutesUntilMeeting: 30
     )
 
@@ -32,37 +32,55 @@ func islandVisibilityHonorsPrivacyAndPreference() {
     #expect(!coordinator.isVisible(isEnabled: false, isSessionActive: true))
     #expect(!coordinator.isVisible(isEnabled: true, isSessionActive: false))
     #expect(!coordinator.isVisible(isEnabled: false, isSessionActive: false))
-
-@Test("Glass controls map to TokenClock's native refraction properties")
-func glassControlsDriveLiveSurfaceAppearance() {
-    let minimum = GlassMaterialAppearance(tint: 0, backingLevel: .clear, refraction: 0)
-    let maximum = GlassMaterialAppearance(tint: 0.3, backingLevel: .solid, refraction: 6)
-
-    #expect(minimum.tintOpacity == 0)
-    #expect(maximum.tintOpacity == 0.3)
-    #expect(minimum.backdropOpacity == 0)
-    #expect(maximum.backdropOpacity == 1)
-    #expect(minimum.variant == 2)
-    #expect(maximum.variant == 2)
-    #expect(minimum.lensing == 0)
-    #expect(maximum.lensing == 6)
 }
 
-@Test("Glass appearance clamps persisted values to the supported laboratory range")
-func glassAppearanceClampsPersistedValues() {
-    let appearance = GlassMaterialAppearance(tint: 2, backingLevel: .light, refraction: 900)
+@Test("Island geometry keeps one surface while adapting to content and hardware")
+func islandGeometryAdaptsToPresentationAndAttachment() {
+    let coordinator = IslandCoordinator()
 
-    #expect(appearance.tintOpacity == 0.3)
-    #expect(appearance.backdropOpacity == 0.25)
-    #expect(appearance.refractionAmount == 6)
-    #expect(appearance.lensing == 6)
+    #expect(coordinator.geometry(for: .music, attachment: .floatingCapsule) == IslandSurfaceGeometry(
+        width: 420,
+        height: 82,
+        cornerRadius: 30,
+        topCornerRadius: 30
+    ))
+    #expect(coordinator.geometry(for: .music, attachment: .notchAttached) == IslandSurfaceGeometry(
+        width: 420,
+        height: 82,
+        cornerRadius: 30,
+        topCornerRadius: 0
+    ))
+    #expect(coordinator.geometry(for: .idle, attachment: .notchAttached).height == 70)
+    #expect(coordinator.geometry(for: .idle, attachment: .floatingCapsule).height == 54)
+    #expect(coordinator.geometry(for: .meeting, attachment: .notchAttached).width == 440)
 }
 
-@Test("Glass refraction rounds into the private 0 through 6 lensing range")
-func glassRefractionMapsToPrivateLensingRange() {
-    #expect(GlassMaterialAppearance(tint: 0, backingLevel: .clear, refraction: 1).lensing == 1)
-    #expect(GlassMaterialAppearance(tint: 0, backingLevel: .clear, refraction: 3).lensing == 3)
-    #expect(GlassMaterialAppearance(tint: 0, backingLevel: .clear, refraction: 5).lensing == 5)
+@Test("Reduce Motion removes surface and optical animation")
+func reduceMotionStopsIslandAnimation() {
+    let coordinator = IslandCoordinator()
+
+    #expect(coordinator.motion(reduceMotion: false, materialMotionEnabled: true) == IslandMotionPolicy(
+        transitionDuration: 0.28,
+        animatesOpticalHighlight: true
+    ))
+    #expect(coordinator.motion(reduceMotion: true, materialMotionEnabled: true) == IslandMotionPolicy(
+        transitionDuration: 0,
+        animatesOpticalHighlight: false
+    ))
+    #expect(!coordinator.motion(reduceMotion: false, materialMotionEnabled: false).animatesOpticalHighlight)
+}
+
+@Test("Preferred display wins, otherwise the current main display is used")
+func islandDisplayResolutionHonorsPreference() {
+    let coordinator = IslandCoordinator()
+    let displays = [
+        IslandDisplay(id: "builtin", name: "Built-in", hasNotch: true),
+        IslandDisplay(id: "desk", name: "Desk", hasNotch: false),
+    ]
+
+    #expect(coordinator.resolveDisplay(preferredID: "desk", mainDisplayID: "builtin", displays: displays)?.id == "desk")
+    #expect(coordinator.resolveDisplay(preferredID: "missing", mainDisplayID: "builtin", displays: displays)?.id == "builtin")
+    #expect(coordinator.resolveDisplay(preferredID: nil, mainDisplayID: nil, displays: displays)?.id == "builtin")
 }
 
 @Test("Glass backing exposes five stable levels and rounds imported values")
@@ -95,7 +113,11 @@ func liquidGlassConfigurationUsesDockDefaults() {
 
 @Test("Liquid Glass dispatch keeps variant before lensing and disables private path cleanly")
 func liquidGlassDispatchPlanIsOrderedAndObservable() {
-    let complete = LiquidGlassConfiguration(tint: 0.1, backingLevel: .clear, lensing: 6)
+    let complete = LiquidGlassConfiguration(
+        tint: 0.1,
+        backingLevel: .clear,
+        lensing: 6
+    )
     let fallback = LiquidGlassConfiguration(
         tint: 0.1,
         backingLevel: .clear,

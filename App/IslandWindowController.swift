@@ -136,7 +136,7 @@ final class IslandWindowController {
         let screens = NSScreen.screens
         let resolved = coordinator.resolveDisplay(
             preferredID: session?.preferredIslandDisplayID,
-            mainDisplayID: NSScreen.main?.lockTuneDisplayID.map(String.init),
+            mainDisplayID: (NSScreen.screens.first(where: { $0.frame.origin == .zero }) ?? NSScreen.main)?.lockTuneDisplayID.map(String.init),
             displays: displayDescriptors
         )
         return resolved.flatMap { selected in

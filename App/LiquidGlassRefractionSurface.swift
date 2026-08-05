@@ -13,8 +13,6 @@ enum LiquidGlassBackdropSource: Equatable {
     case withinWindow
 }
 
-typealias GlassBackdropSource = LiquidGlassBackdropSource
-
 struct LiquidGlassCapabilities: Equatable, Sendable {
     var systemSupportsGlass = false
     var variantSelectorAvailable = false
@@ -472,31 +470,6 @@ struct LiquidGlassSurfaceContainer<Content: View>: NSViewRepresentable {
             contentView.rootView = content()
         }
         session.setLiquidGlassRuntimeMode(host.runtimeMode)
-    }
-}
-
-// Compatibility shim kept until IslandWindowController is switched to the
-// full host. It already delegates to the same AppKit host, so there is no
-// second material implementation or second SPI path.
-struct GlassMaterialSurface<S: Shape>: View {
-    @Bindable var session: AppSession
-    let shape: S
-    var cornerRadius: CGFloat
-    var backdropSource: GlassBackdropSource = .behindWindow
-    var reduceMotion = false
-
-    var body: some View {
-        LiquidGlassSurfaceContainer(
-            session: session,
-            cornerRadius: cornerRadius,
-            backdropSource: backdropSource,
-            reduceMotion: reduceMotion,
-            reduceTransparency: false
-        ) {
-            Color.clear
-        }
-        .clipShape(shape)
-        .allowsHitTesting(false)
     }
 }
 
