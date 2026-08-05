@@ -84,6 +84,7 @@ private struct MusicLibraryView: View {
                     }.padding(.horizontal, 30).padding(.top, 27).padding(.bottom, 20)
                     if session.musicLibrary.tracks.isEmpty {
                         ContentUnavailableView { Label("sidebar.library", systemImage: "music.note.list") } description: { Text("placeholder.library") } actions: { Button("library.addFolder", systemImage: "folder.badge.plus") { Task { await session.chooseMusicFolder() } } }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
                         List(selection: $selectedTrackID) {
                             ForEach(sortedRows) { row in
@@ -104,10 +105,14 @@ private struct MusicLibraryView: View {
                                 .simultaneousGesture(TapGesture(count: 2).onEnded { Task { await session.play(trackID: track.id) } })
                             }
                         }.listStyle(.plain).scrollContentBackground(.hidden).background(Color.white)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
-                }.frame(maxWidth: .infinity).background(Color.white)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .background(Color.white)
                 if isCalendarPanelVisible { Divider(); CompactCalendarPanel(session: session).frame(width: 310) }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .overlay(alignment: .topTrailing) {
             if let progress = session.musicScanProgress {
@@ -801,6 +806,7 @@ private struct PlayerBar: View {
                 }
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
+                .frame(width: 34, height: 34)
                 .disabled(session.playback.currentItem == nil || session.playback.phase == .loading)
 
                 Button("player.shuffle", systemImage: "shuffle") {
@@ -812,6 +818,7 @@ private struct PlayerBar: View {
                 }
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
+                .frame(width: 34, height: 34)
                 .foregroundStyle(session.playback.order == .shuffled ? Color.accentColor : Color.secondary)
                 .disabled(session.playback.queue.count < 2)
 
@@ -821,9 +828,8 @@ private struct PlayerBar: View {
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 42, height: 42)
-                .background(Color.black, in: Circle())
+                .foregroundStyle(.primary)
+                .frame(width: 34, height: 34)
                 .disabled(!canTogglePlayback)
 
                 Button("player.next", systemImage: "forward.fill") {
@@ -831,6 +837,7 @@ private struct PlayerBar: View {
                 }
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
+                .frame(width: 34, height: 34)
                 .disabled(session.playback.currentItem == nil || session.playback.phase == .loading)
 
                 Button(repeatLabel, systemImage: repeatImage) {
@@ -838,6 +845,7 @@ private struct PlayerBar: View {
                 }
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
+                .frame(width: 34, height: 34)
                 .foregroundStyle(session.playback.repeatMode == .off ? Color.secondary : Color.accentColor)
                 .disabled(session.playback.queue.isEmpty)
 
