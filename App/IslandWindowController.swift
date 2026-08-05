@@ -5,18 +5,25 @@ import SwiftUI
 
 @MainActor
 final class IslandWindowController {
+    private static let panelSize = NSSize(width: 440, height: 82)
+
     private var panel: IslandPanel?
+    private weak var session: AppSession?
     private var observers: [NSObjectProtocol] = []
     private var isSessionActive = true
     private var isEnabled = true
     private var displayedScreenID: CGDirectDisplayID?
-    private let visibilityPolicy = IslandCoordinator()
+    private var activeAppearanceCapabilities: LiquidGlassActiveAppearanceCapabilities?
+    private let coordinator = IslandCoordinator()
 
     func show(session: AppSession) {
         guard panel == nil else { return }
+        self.session = session
         isEnabled = session.isIslandEnabled
+        let activeAppearance = LiquidGlassActiveAppearanceOverride.apply(to: IslandPanel.self)
+        activeAppearanceCapabilities = activeAppearance
         let panel = IslandPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 380, height: 72),
+            contentRect: NSRect(origin: .zero, size: Self.panelSize),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -29,6 +36,7 @@ final class IslandWindowController {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         panel.hidesOnDeactivate = false
         panel.isMovable = false
+        panel.acceptsMouseMovedEvents = true
         panel.setAccessibilityLabel(String(localized: "island.accessibility"))
         panel.contentView = NSHostingView(rootView: IslandView(session: session))
         self.panel = panel
@@ -52,11 +60,48 @@ final class IslandWindowController {
         observers.removeAll()
         panel?.close()
         panel = nil
+        session = nil
         displayedScreenID = nil
+    }
+
+    func reposition() {
+        guard shouldBeVisible, let panel, let screen = targetScreen else { return }
+        let attachment: IslandAttachment = screen.hasHardwareNotch ? .notchAttached : .floatingCapsule
+        let topGap: CGFloat = attachment == .notchAttached ? 0 : 8
+        let anchorY = attachment == .notchAttached ? screen.frame.maxY : screen.visibleFrame.maxY
+        let frame = NSRect(
+            x: (screen.frame.midX - panel.frame.width / 2).rounded(),
+            y: (anchorY - panel.frame.height - topGap).rounded(),
+            width: panel.frame.width,
+            height: panel.frame.height
+        )
+        let screenID = screen.lockTuneDisplayID
+        session?.updateIslandDisplayEnvironment(
+            displays: displayDescriptors,
+            attachment: attachment,
+            hardwareNotchWidth: Double(screen.hardwareNotchWidth)
+        )
+        guard panel.frame != frame || displayedScreenID != screenID else { return }
+
+        panel.orderOut(nil)
+        panel.setFrame(frame, display: false)
+        panel.displayIfNeeded()
+        panel.orderFrontRegardless()
+        displayedScreenID = screenID
     }
 
     private func installObservers() {
         let workspaceCenter = NSWorkspace.shared.notificationCenter
+        observers.append(workspaceCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard self?.session?.preferredIslandDisplayID == nil else { return }
+                self?.reposition()
+            }
+        })
         observers.append(workspaceCenter.addObserver(
             forName: NSWorkspace.sessionDidResignActiveNotification,
             object: nil,
@@ -87,37 +132,31 @@ final class IslandWindowController {
         })
     }
 
-    private func reposition() {
-        guard shouldBeVisible, let panel, let screen = targetScreen else { return }
-        let x = screen.frame.midX - panel.frame.width / 2
-        let availableTop = screen.safeAreaInsets.top > 0
-            ? screen.frame.maxY - screen.safeAreaInsets.top
-            : screen.visibleFrame.maxY
-        let y = availableTop - panel.frame.height - 4
-        let frame = NSRect(
-            x: x.rounded(),
-            y: y.rounded(),
-            width: panel.frame.width,
-            height: panel.frame.height
+    private var targetScreen: NSScreen? {
+        let screens = NSScreen.screens
+        let resolved = coordinator.resolveDisplay(
+            preferredID: session?.preferredIslandDisplayID,
+            mainDisplayID: NSScreen.main?.lockTuneDisplayID.map(String.init),
+            displays: displayDescriptors
         )
-        let screenID = screen.displayID
-        guard panel.frame != frame || displayedScreenID != screenID else { return }
-
-        // Move the independent status-bar panel without animating or carrying
-        // the previous display's glass snapshot into the new screen.
-        panel.orderOut(nil)
-        panel.setFrame(frame, display: false)
-        panel.displayIfNeeded()
-        panel.orderFrontRegardless()
-        displayedScreenID = screenID
+        return resolved.flatMap { selected in
+            screens.first { $0.lockTuneDisplayID.map(String.init) == selected.id }
+        } ?? NSScreen.main ?? screens.first
     }
 
-    private var targetScreen: NSScreen? {
-        NSScreen.main ?? NSScreen.screens.first(where: { $0.isBuiltin }) ?? NSScreen.screens.first
+    private var displayDescriptors: [IslandDisplay] {
+        NSScreen.screens.compactMap { screen in
+            guard let id = screen.lockTuneDisplayID else { return nil }
+            return IslandDisplay(
+                id: String(id),
+                name: screen.localizedName,
+                hasNotch: screen.hasHardwareNotch
+            )
+        }
     }
 
     private var shouldBeVisible: Bool {
-        visibilityPolicy.isVisible(isEnabled: isEnabled, isSessionActive: isSessionActive)
+        coordinator.isVisible(isEnabled: isEnabled, isSessionActive: isSessionActive)
     }
 }
 
@@ -126,252 +165,254 @@ private final class IslandPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
-private extension NSScreen {
-    var displayID: CGDirectDisplayID? {
+extension NSScreen {
+    var lockTuneDisplayID: CGDirectDisplayID? {
         deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
     }
 
-    var isBuiltin: Bool {
-        guard let screenNumber = displayID
-        else { return false }
-        return CGDisplayIsBuiltin(screenNumber) != 0
+    var hasHardwareNotch: Bool {
+        guard safeAreaInsets.top > 0 else { return false }
+        return auxiliaryTopLeftArea != nil || auxiliaryTopRightArea != nil
+    }
+
+    var hardwareNotchWidth: CGFloat {
+        guard let left = auxiliaryTopLeftArea, let right = auxiliaryTopRightArea else { return 0 }
+        return max(0, right.minX - left.maxX)
     }
 }
 
 private struct IslandView: View {
     @Bindable var session: AppSession
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var isHovered = false
 
-    private let islandAnimation = Animation.spring(response: 0.38, dampingFraction: 0.84)
+    private let coordinator = IslandCoordinator()
 
     var body: some View {
-        islandContent
-        .scaleEffect(isHovered ? 1.012 : 1)
-        .animation(reduceMotion ? nil : islandAnimation, value: geometry)
-        .onHover { hovering in
-            guard !reduceMotion else { return }
-            isHovered = hovering
+        VStack(spacing: 0) {
+            islandSurface
+            Spacer(minLength: 0)
         }
-            .padding(4)
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel("island.accessibility")
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .scaleEffect(isHovered && !reduceMotion ? 1.008 : 1, anchor: .top)
+        .animation(surfaceAnimation, value: geometry)
+        .animation(surfaceAnimation, value: session.islandAttachment)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("island.accessibility")
     }
 
-    private var islandContent: some View {
-        ZStack {
-            Color.white.opacity(session.glassTint)
-                .clipShape(RoundedRectangle(cornerRadius: geometry.cornerRadius, style: .continuous))
-            GlassEdgeMaterial(session: session, cornerRadius: geometry.cornerRadius)
-            HStack(spacing: 12) {
-                icon
-                    .font(.title3)
-                    .frame(width: 34, height: 34)
-                    .background(.white.opacity(0.12), in: Circle())
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(primaryText)
-                        .font(.headline)
-                        .lineLimit(1)
-                    Text(secondaryText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+    private var islandSurface: some View {
+        LiquidGlassSurfaceContainer(
+            session: session,
+            cornerRadius: CGFloat(geometry.cornerRadius),
+            backdropSource: .behindWindow,
+            reduceMotion: reduceMotion,
+            reduceTransparency: reduceTransparency
+        ) {
+            VStack(spacing: 0) {
+                if session.islandAttachment == .notchAttached {
+                    Color.clear
+                        .frame(height: notchClearance)
+                        .allowsHitTesting(false)
                 }
-
-                Spacer(minLength: 8)
-
-                if presentation == .meeting, let meetURL = session.nextMeeting?.meetURL {
-                    Button {
-                        NSWorkspace.shared.open(meetURL)
-                    } label: {
-                        Image(systemName: "video.fill")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .help("calendar.joinMeet")
-                } else if presentation == .music {
-                    Button {
-                        Task { await session.togglePlayPause() }
-                    } label: {
-                        Image(systemName: session.playback.phase == .playing ? "pause.fill" : "play.fill")
-                    }
-                    .buttonStyle(.plain)
+                IslandContent {
+                    content
                 }
+                    .frame(maxHeight: .infinity)
             }
-            .padding(.horizontal, 15)
-            .foregroundStyle(.primary)
+            .padding(.horizontal, 16)
         }
-        .frame(width: geometry.width, height: geometry.height)
-    }
-
-    private var presentation: IslandPresentation { session.islandPresentation }
-
-    private var geometry: IslandGeometry {
-        switch presentation {
-        case .idle:
-            IslandGeometry(width: 188, height: 48, cornerRadius: 24)
-        case .music:
-            IslandGeometry(width: 308, height: 56, cornerRadius: 28)
-        case .meeting:
-            IslandGeometry(width: 380, height: 64, cornerRadius: 32)
-        }
+        .frame(width: resolvedWidth, height: CGFloat(geometry.height))
+        .clipShape(shape)
+        .contentShape(shape)
+        .onHover { isHovered = $0 }
+        .shadow(color: .black.opacity(session.islandAttachment == .notchAttached ? 0.18 : 0.24), radius: 18, y: 8)
     }
 
     @ViewBuilder
-    private var icon: some View {
+    private var content: some View {
         switch presentation {
-        case .meeting: Image(systemName: "calendar.badge.clock")
-        case .music: Image(systemName: "waveform")
-        case .idle: Image(systemName: "music.note")
+        case .music: musicContent
+        case .meeting: meetingContent
+        case .idle: idleContent
         }
     }
 
-    private var primaryText: String {
-        switch presentation {
-        case .meeting:
-            let title = session.nextMeeting?.title ?? ""
-            return title.isEmpty ? String(localized: "calendar.untitled") : title
-        case .music: return session.currentTrackTitle
-        case .idle: return String(localized: "app.name")
-        }
-    }
-
-    private var secondaryText: String {
-        switch presentation {
-        case .meeting:
-            guard let meeting = session.nextMeeting else { return String(localized: "island.meetingSoon") }
-            return meeting.start.formatted(date: .abbreviated, time: .shortened)
-        case .music:
-            return session.playback.currentItem?.artist ?? String(localized: "player.localFirst")
-        case .idle:
-            return String(localized: "island.idle")
-        }
-    }
-}
-
-struct GlassEdgeMaterial: View {
-    @Bindable var session: AppSession
-    let cornerRadius: CGFloat
-
-    private var edgeWidth: CGFloat {
-        2 + CGFloat(session.glassRefraction) / 16
-    }
-
-    var body: some View {
-        ZStack {
-            EdgeMaterialView(
-                tint: session.glassTint,
-                edgeWidth: edgeWidth,
-                cornerRadius: cornerRadius
-            )
-            .blur(radius: CGFloat(session.glassBlur) / 6)
-            .mask(edgeMask)
-
-            if session.glassMotionEnabled {
-                TimelineView(.animation(minimumInterval: 1 / 30)) { context in
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .stroke(
-                            AngularGradient(
-                                colors: [.white.opacity(0.04), .white.opacity(0.3), .white.opacity(0.04)],
-                                center: .center,
-                                angle: .degrees(context.date.timeIntervalSinceReferenceDate * 16)
-                            ),
-                            lineWidth: 1.5 + CGFloat(session.glassRefraction) / 24
-                        )
-                }
+    private var musicContent: some View {
+        HStack(spacing: 12) {
+            artwork
+            VStack(alignment: .leading, spacing: 5) {
+                Text(session.currentTrackTitle)
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .lineLimit(1)
+                Text(session.playback.currentItem?.artist ?? String(localized: "player.localFirst"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                ProgressView(value: progress)
+                    .progressViewStyle(.linear)
+                    .tint(.primary.opacity(0.86))
+                    .accessibilityLabel("island.playbackProgress")
+                    .accessibilityValue(Text(progress, format: .percent))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            controlButton("player.previous", systemImage: "backward.fill") {
+                await session.playPrevious()
+            }
+            controlButton(
+                session.playback.phase == .playing ? "player.pause" : "player.play",
+                systemImage: session.playback.phase == .playing ? "pause.fill" : "play.fill",
+                prominent: true
+            ) {
+                await session.togglePlayPause()
+            }
+            controlButton("player.next", systemImage: "forward.fill") {
+                await session.playNext()
             }
         }
-        .opacity(0.35 + session.glassRefraction / 250)
-        .allowsHitTesting(false)
+        .foregroundStyle(.primary)
     }
 
-    private var edgeMask: some View {
-        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            .stroke(.white, lineWidth: edgeWidth)
+    private var meetingContent: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "calendar.badge.clock")
+                .font(.title3)
+                .frame(width: 42, height: 42)
+                .background(.primary.opacity(0.1), in: Circle())
+            VStack(alignment: .leading, spacing: 3) {
+                Text(primaryText).font(.headline).lineLimit(1)
+                Text(secondaryText).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            if let meetURL = session.nextMeeting?.meetURL {
+                Button {
+                    NSWorkspace.shared.open(meetURL)
+                } label: {
+                    Label("calendar.joinMeet", systemImage: "video.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.primary)
+                .foregroundStyle(Color(nsColor: .windowBackgroundColor))
+            }
+        }
+        .foregroundStyle(.primary)
     }
-}
 
-private struct EdgeMaterialView: NSViewRepresentable {
-    let tint: Double
-    let edgeWidth: CGFloat
-    let cornerRadius: CGFloat
-
-    func makeNSView(context: Context) -> EdgeMaterialHostView {
-        EdgeMaterialHostView()
+    private var idleContent: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "music.note")
+            VStack(alignment: .leading, spacing: 1) {
+                Text("LockTune").font(.headline)
+                Text("island.idle").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .foregroundStyle(.primary)
     }
 
-    func updateNSView(_ view: EdgeMaterialHostView, context: Context) {
-        view.update(tint: tint, edgeWidth: edgeWidth, cornerRadius: cornerRadius)
-    }
-}
-
-private final class EdgeMaterialHostView: NSView {
-    private let materialView: NSView
-    private let maskLayer = CAShapeLayer()
-    private var edgeWidth: CGFloat = 8
-    private var cornerRadius: CGFloat = 28
-
-    override init(frame frameRect: NSRect) {
-        if #available(macOS 26.0, *) {
-            let glassView = NSGlassEffectView()
-            glassView.style = .clear
-            glassView.cornerRadius = 0
-            materialView = glassView
+    @ViewBuilder
+    private var artwork: some View {
+        if let data = session.currentArtworkData, let image = NSImage(data: data) {
+            Image(nsImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 50, height: 50)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         } else {
-            let effectView = NSVisualEffectView()
-            effectView.material = .underWindowBackground
-            effectView.blendingMode = .behindWindow
-            effectView.state = .active
-            effectView.isEmphasized = false
-            materialView = effectView
+            Image(systemName: "music.note")
+                .font(.title3)
+                .frame(width: 50, height: 50)
+                .background(.primary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
-        super.init(frame: frameRect)
-        wantsLayer = true
-        materialView.wantsLayer = true
-        materialView.layer?.mask = maskLayer
-        addSubview(materialView)
     }
 
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    func update(tint: Double, edgeWidth: CGFloat, cornerRadius: CGFloat) {
-        self.edgeWidth = edgeWidth
-        self.cornerRadius = cornerRadius
-        if #available(macOS 26.0, *), let glassView = materialView as? NSGlassEffectView {
-            glassView.tintColor = NSColor.white.withAlphaComponent(tint)
+    private func controlButton(
+        _ title: LocalizedStringKey,
+        systemImage: String,
+        prominent: Bool = false,
+        action: @escaping @MainActor () async -> Void
+    ) -> some View {
+        Button {
+            Task { await action() }
+        } label: {
+            Image(systemName: systemImage)
+                .frame(width: prominent ? 34 : 26, height: prominent ? 34 : 26)
+                .background(prominent ? Color.primary : Color.clear, in: Circle())
+                .foregroundStyle(prominent ? Color(nsColor: .windowBackgroundColor) : Color.primary)
         }
-        needsLayout = true
+        .buttonStyle(.plain)
+        .help(title)
+        .accessibilityLabel(title)
     }
 
-    override func layout() {
-        super.layout()
-        materialView.frame = bounds
-        let ring = CGMutablePath()
-        ring.addPath(CGPath(
-            roundedRect: bounds,
-            cornerWidth: cornerRadius,
-            cornerHeight: cornerRadius,
-            transform: nil
-        ))
-        let inset = min(edgeWidth, min(bounds.width, bounds.height) / 2)
-        let innerBounds = bounds.insetBy(dx: inset, dy: inset)
-        ring.addPath(CGPath(
-            roundedRect: innerBounds,
-            cornerWidth: max(0, cornerRadius - inset),
-            cornerHeight: max(0, cornerRadius - inset),
-            transform: nil
-        ))
-        maskLayer.frame = bounds
-        maskLayer.path = ring
-        maskLayer.fillRule = .evenOdd
-        maskLayer.fillColor = NSColor.black.cgColor
+    private var presentation: IslandPresentation { session.islandPresentation }
+    private var geometry: IslandSurfaceGeometry {
+        coordinator.geometry(for: presentation, attachment: session.islandAttachment)
+    }
+    private var resolvedWidth: CGFloat {
+        let contentWidth = CGFloat(geometry.width)
+        guard session.islandAttachment == .notchAttached else { return contentWidth }
+        return max(contentWidth, CGFloat(session.islandHardwareNotchWidth) + 40)
+    }
+    private var notchClearance: CGFloat {
+        min(32, CGFloat(geometry.height) * 0.42)
+    }
+    private var shape: IslandContinuousShape {
+        IslandContinuousShape(
+            topRadius: CGFloat(geometry.topCornerRadius),
+            bottomRadius: CGFloat(geometry.cornerRadius)
+        )
+    }
+    private var surfaceAnimation: Animation? {
+        let policy = coordinator.motion(
+            reduceMotion: reduceMotion,
+            materialMotionEnabled: session.glassMotionEnabled
+        )
+        guard policy.transitionDuration > 0 else { return nil }
+        return .spring(duration: policy.transitionDuration, bounce: 0.12)
+    }
+    private var progress: Double {
+        guard let duration = session.playback.duration, duration > 0 else { return 0 }
+        return min(max(session.playback.elapsed / duration, 0), 1)
+    }
+    private var primaryText: String {
+        let title = session.nextMeeting?.title ?? ""
+        return title.isEmpty ? String(localized: "calendar.untitled") : title
+    }
+    private var secondaryText: String {
+        guard let meeting = session.nextMeeting else { return String(localized: "island.meetingSoon") }
+        return meeting.start.formatted(date: .abbreviated, time: .shortened)
     }
 }
 
-private struct IslandGeometry: Equatable {
-    let width: CGFloat
-    let height: CGFloat
-    let cornerRadius: CGFloat
+private struct IslandContent<Content: View>: View {
+    let content: () -> Content
+
+    var body: some View { content() }
+}
+
+private struct IslandContinuousShape: Shape {
+    var topRadius: CGFloat
+    var bottomRadius: CGFloat
+
+    var animatableData: AnimatablePair<CGFloat, CGFloat> {
+        get { AnimatablePair(topRadius, bottomRadius) }
+        set {
+            topRadius = newValue.first
+            bottomRadius = newValue.second
+        }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        UnevenRoundedRectangle(
+            cornerRadii: RectangleCornerRadii(
+                topLeading: topRadius,
+                bottomLeading: bottomRadius,
+                bottomTrailing: bottomRadius,
+                topTrailing: topRadius
+            ),
+            style: .continuous
+        )
+        .path(in: rect)
+    }
 }
