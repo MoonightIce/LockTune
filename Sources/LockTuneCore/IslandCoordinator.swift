@@ -63,6 +63,27 @@ public struct IslandCoordinator: Sendable {
         min(max(max(0, menuBarHeight) / 3, 6), 10)
     }
 
+    public func panelPlacement(
+        for display: IslandDisplayGeometry,
+        panelWidth: Double,
+        panelHeight: Double
+    ) -> IslandPanelPlacement {
+        let menuBarHeight = max(0, display.frame.maxY - display.visibleFrame.maxY)
+        let topGap = display.attachment == .notchAttached
+            ? 0
+            : floatingTopGap(menuBarHeight: menuBarHeight)
+        let targetTop = display.attachment == .notchAttached
+            ? display.frame.maxY
+            : display.visibleFrame.maxY - topGap
+        let frame = IslandRect(
+            x: display.frame.midX - panelWidth / 2,
+            y: targetTop - panelHeight,
+            width: panelWidth,
+            height: panelHeight
+        )
+        return IslandPanelPlacement(frame: frame, targetTop: targetTop, topGap: topGap)
+    }
+
     public func resolvedWidth(
         for geometry: IslandSurfaceGeometry,
         attachment: IslandAttachment,

@@ -132,6 +132,71 @@ func islandDisplayResolutionHonorsPreference() {
     #expect(coordinator.resolveDisplay(preferredID: nil, mainDisplayID: nil, displays: displays)?.id == "builtin")
 }
 
+@Test("Panel placement anchors a notch display to the physical screen top")
+func notchPanelPlacementUsesScreenFrameTop() {
+    let coordinator = IslandCoordinator()
+    let display = IslandDisplayGeometry(
+        displayID: 1,
+        frame: IslandRect(x: 0, y: 0, width: 1512, height: 982),
+        visibleFrame: IslandRect(x: 0, y: 90, width: 1512, height: 859),
+        safeAreaInsets: IslandEdgeInsets(top: 32, left: 0, bottom: 0, right: 0),
+        auxiliaryTopLeftArea: IslandRect(x: 0, y: 950, width: 665, height: 32),
+        auxiliaryTopRightArea: IslandRect(x: 850, y: 950, width: 662, height: 32),
+        attachment: .notchAttached
+    )
+
+    let placement = coordinator.panelPlacement(for: display, panelWidth: 440, panelHeight: 132)
+
+    #expect(placement.topGap == 0)
+    #expect(placement.targetTop == display.frame.maxY)
+    #expect(placement.frame.maxY == display.frame.maxY)
+    #expect(placement.frame == IslandRect(x: 536, y: 850, width: 440, height: 132))
+    #expect(display.hardwareNotchWidth == 185)
+    #expect(display.hardwareNotchHeight == 32)
+}
+
+@Test("Panel placement preserves the floating gap on negative-coordinate displays")
+func floatingPanelPlacementPreservesNegativeDisplayCoordinates() {
+    let coordinator = IslandCoordinator()
+    let display = IslandDisplayGeometry(
+        displayID: 2,
+        frame: IslandRect(x: -1920, y: 800, width: 1920, height: 1080),
+        visibleFrame: IslandRect(x: -1920, y: 800, width: 1920, height: 990),
+        safeAreaInsets: IslandEdgeInsets(top: 0, left: 0, bottom: 0, right: 0),
+        auxiliaryTopLeftArea: nil,
+        auxiliaryTopRightArea: nil,
+        attachment: .floatingCapsule
+    )
+
+    let placement = coordinator.panelPlacement(for: display, panelWidth: 196, panelHeight: 42)
+
+    #expect(placement.topGap == 10)
+    #expect(placement.targetTop == 1780)
+    #expect(placement.frame == IslandRect(x: -1058, y: 1738, width: 196, height: 42))
+    #expect(placement.frame.maxY == placement.targetTop)
+}
+
+@Test("Panel placement handles a vertically stacked display without using the origin")
+func panelPlacementHandlesVerticallyStackedDisplay() {
+    let coordinator = IslandCoordinator()
+    let display = IslandDisplayGeometry(
+        displayID: 3,
+        frame: IslandRect(x: 0, y: 982, width: 1512, height: 982),
+        visibleFrame: IslandRect(x: 0, y: 1072, width: 1512, height: 859),
+        safeAreaInsets: IslandEdgeInsets(top: 0, left: 0, bottom: 0, right: 0),
+        auxiliaryTopLeftArea: nil,
+        auxiliaryTopRightArea: nil,
+        attachment: .floatingCapsule
+    )
+
+    let placement = coordinator.panelPlacement(for: display, panelWidth: 208, panelHeight: 47)
+
+    #expect(placement.topGap == 10)
+    #expect(placement.targetTop == 1921)
+    #expect(placement.frame.minX == 652)
+    #expect(placement.frame.maxY == 1921)
+}
+
 @Test("Glass backing exposes five stable levels and rounds imported values")
 func glassBackingLevelsAreStable() {
     #expect(GlassBackingLevel.allCases.map(\.rawValue) == [0, 25, 50, 75, 100])

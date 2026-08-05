@@ -19,6 +19,96 @@ public enum IslandExpansionState: String, Equatable, Sendable {
     case expanded
 }
 
+public struct IslandEdgeInsets: Equatable, Sendable {
+    public let top: Double
+    public let left: Double
+    public let bottom: Double
+    public let right: Double
+
+    public init(top: Double, left: Double, bottom: Double, right: Double) {
+        self.top = top
+        self.left = left
+        self.bottom = bottom
+        self.right = right
+    }
+}
+
+/// Platform-neutral rectangle used in display snapshots. Keeping AppKit's
+/// `CGRect` at the application boundary makes this value safe to pass through
+/// the core/domain modules and keeps placement tests deterministic.
+public struct IslandRect: Equatable, Sendable {
+    public let x: Double
+    public let y: Double
+    public let width: Double
+    public let height: Double
+
+    public init(x: Double, y: Double, width: Double, height: Double) {
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+    }
+
+    public var minX: Double { x }
+    public var minY: Double { y }
+    public var maxX: Double { x + width }
+    public var maxY: Double { y + height }
+    public var midX: Double { x + width / 2 }
+    public var midY: Double { y + height / 2 }
+}
+
+/// Immutable display geometry shared by the AppKit panel and SwiftUI content.
+/// The display ID is part of the value so a screen change cannot silently
+/// reuse a stale safe-area or notch measurement.
+public struct IslandDisplayGeometry: Equatable, Sendable {
+    public let displayID: UInt32
+    public let frame: IslandRect
+    public let visibleFrame: IslandRect
+    public let safeAreaInsets: IslandEdgeInsets
+    public let auxiliaryTopLeftArea: IslandRect?
+    public let auxiliaryTopRightArea: IslandRect?
+    public let attachment: IslandAttachment
+
+    public init(
+        displayID: UInt32,
+        frame: IslandRect,
+        visibleFrame: IslandRect,
+        safeAreaInsets: IslandEdgeInsets,
+        auxiliaryTopLeftArea: IslandRect?,
+        auxiliaryTopRightArea: IslandRect?,
+        attachment: IslandAttachment
+    ) {
+        self.displayID = displayID
+        self.frame = frame
+        self.visibleFrame = visibleFrame
+        self.safeAreaInsets = safeAreaInsets
+        self.auxiliaryTopLeftArea = auxiliaryTopLeftArea
+        self.auxiliaryTopRightArea = auxiliaryTopRightArea
+        self.attachment = attachment
+    }
+
+    public var hardwareNotchWidth: Double {
+        guard let left = auxiliaryTopLeftArea, let right = auxiliaryTopRightArea else { return 0 }
+        return max(0, right.minX - left.maxX)
+    }
+
+    public var hardwareNotchHeight: Double {
+        safeAreaInsets.top
+    }
+}
+
+public struct IslandPanelPlacement: Equatable, Sendable {
+    public let frame: IslandRect
+    public let targetTop: Double
+    public let topGap: Double
+
+    public init(frame: IslandRect, targetTop: Double, topGap: Double) {
+        self.frame = frame
+        self.targetTop = targetTop
+        self.topGap = topGap
+    }
+}
+
 public struct IslandSurfaceGeometry: Equatable, Sendable {
     public let width: Double
     public let height: Double

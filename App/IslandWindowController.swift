@@ -6,6 +6,7 @@ import SwiftUI
 private extension Notification.Name {
     static let lockTuneIslandEscape = Notification.Name("LockTune.IslandEscape")
     static let lockTuneIslandPointerDown = Notification.Name("LockTune.IslandPointerDown")
+    static let lockTuneIslandGeometryStateChanged = Notification.Name("LockTune.IslandGeometryStateChanged")
 }
 
 @MainActor
@@ -80,33 +81,135 @@ final class IslandWindowController {
     }
 
     func reposition() {
-        guard shouldBeVisible, let panel, let screen = targetScreen else { return }
-        let attachment: IslandAttachment = screen.hasHardwareNotch ? .notchAttached : .floatingCapsule
-        let menuBarHeight = screen.frame.maxY - screen.visibleFrame.maxY
-        let topGap: CGFloat = attachment == .notchAttached
-            ? 0
-            : CGFloat(coordinator.floatingTopGap(menuBarHeight: Double(menuBarHeight)))
-        let anchorY = attachment == .notchAttached ? screen.frame.maxY : screen.visibleFrame.maxY
-        let panelWidth = min(Self.panelSize.width, max(1, screen.visibleFrame.width))
-        let frame = NSRect(
-            x: (screen.frame.midX - panelWidth / 2).rounded(),
-            y: (anchorY - panel.frame.height - topGap).rounded(),
-            width: panelWidth,
-            height: panel.frame.height
+        guard shouldBeVisible,
+              let panel,
+              let screen = targetScreen,
+              let displayGeometry = screen.islandDisplayGeometry
+        else { return }
+        panel.allowsTopSafeArea = displayGeometry.attachment == .notchAttached
+        let panelWidth = min(Self.panelSize.width, max(1, displayGeometry.visibleFrame.width))
+        let placement = coordinator.panelPlacement(
+            for: displayGeometry,
+            panelWidth: Double(panelWidth),
+            panelHeight: Double(panel.frame.height)
         )
-        let screenID = screen.lockTuneDisplayID
+        let requestedFrame = NSRect(
+            x: placement.frame.minX,
+            y: placement.frame.minY,
+            width: placement.frame.width,
+            height: placement.frame.height
+        )
+        let screenID = displayGeometry.displayID
         session?.updateIslandDisplayEnvironment(
             displays: displayDescriptors,
-            attachment: attachment,
-            hardwareNotchWidth: Double(screen.hardwareNotchWidth)
+            geometry: displayGeometry
         )
-        guard panel.frame != frame || displayedScreenID != screenID else { return }
-
-        panel.orderOut(nil)
-        panel.setFrame(frame, display: false)
-        panel.displayIfNeeded()
-        panel.orderFrontRegardless()
+        if panel.frame != requestedFrame || displayedScreenID != screenID {
+            panel.orderOut(nil)
+            panel.setFrame(requestedFrame, display: false)
+            panel.displayIfNeeded()
+            panel.orderFrontRegardless()
+        }
+        validatePlacement(
+            panel: panel,
+            targetScreen: screen,
+            displayGeometry: displayGeometry,
+            requestedFrame: requestedFrame,
+            placement: placement
+        )
         displayedScreenID = screenID
+        // SwiftUI may still be laying out the shared path when setFrame
+        // returns. Re-read the applied panel and surface frames once the next
+        // run-loop turn has committed the host hierarchy.
+        DispatchQueue.main.async { [weak self, weak panel] in
+            guard let self, let panel, self.shouldBeVisible else { return }
+            self.validatePlacement(
+                panel: panel,
+                targetScreen: screen,
+                displayGeometry: displayGeometry,
+                requestedFrame: requestedFrame,
+                placement: placement
+            )
+        }
+    }
+
+    private func validatePlacement(
+        panel: IslandPanel,
+        targetScreen: NSScreen,
+        displayGeometry: IslandDisplayGeometry,
+        requestedFrame: NSRect,
+        placement: IslandPanelPlacement
+    ) {
+        panel.contentView?.layoutSubtreeIfNeeded()
+        let appliedFrame = panel.frame
+        let surfaceFrame = surfaceGlobalFrame(in: panel)
+        let appliedTopError = abs(appliedFrame.maxY - placement.targetTop)
+        let surfaceTopError = surfaceFrame.map { abs($0.maxY - placement.targetTop) }
+            ?? .infinity
+        let panelDisplayID = displayContaining(panel.frame)?.lockTuneDisplayID
+        let targetDisplayID = targetScreen.lockTuneDisplayID ?? displayGeometry.displayID
+        let displayMatches = panelDisplayID == targetDisplayID
+        let placementPassed = appliedTopError <= 0.5
+            && surfaceTopError <= 0.5
+            && displayMatches
+        let surfaceDescription = surfaceFrame.map(frameDescription) ?? "pending"
+        NSLog(
+            "LOCKTUNE_ISLAND_PLACEMENT status=%@ attachment=%@ display=%u requested=%@ applied=%@ surface=%@ targetTop=%.2f panelTopError=%.2f surfaceTopError=%.2f panelDisplay=%@ targetDisplay=%u layer=%ld alpha=%.2f onscreen=%@",
+            placementPassed ? "PASS" : "FAIL",
+            displayGeometry.attachment == .notchAttached ? "notch" : "floating",
+            displayGeometry.displayID,
+            frameDescription(requestedFrame),
+            frameDescription(appliedFrame),
+            surfaceDescription,
+            placement.targetTop,
+            appliedTopError,
+            surfaceTopError,
+            panelDisplayID.map(String.init) ?? "none",
+            targetDisplayID,
+            panel.level.rawValue,
+            panel.alphaValue,
+            panel.isOnActiveSpace && panel.isVisible ? "YES" : "NO"
+        )
+
+        guard appliedTopError > 0.5 else { return }
+        var correctedFrame = appliedFrame
+        correctedFrame.origin.y += placement.targetTop - appliedFrame.maxY
+        panel.setFrame(correctedFrame, display: false)
+        panel.displayIfNeeded()
+        let correctedApplied = panel.frame
+        let correctedError = abs(correctedApplied.maxY - placement.targetTop)
+        NSLog(
+            "LOCKTUNE_ISLAND_PLACEMENT_CORRECTION requested=%@ applied=%@ topError=%.2f",
+            frameDescription(correctedFrame),
+            frameDescription(correctedApplied),
+            correctedError
+        )
+    }
+
+    private func surfaceGlobalFrame(in panel: IslandPanel) -> NSRect? {
+        guard let host = findSurfaceHost(in: panel.contentView),
+              let window = host.window
+        else { return nil }
+        let windowFrame = host.convert(host.bounds, to: nil)
+        return window.convertToScreen(windowFrame)
+    }
+
+    private func findSurfaceHost(in view: NSView?) -> LiquidGlassSurfaceHost? {
+        guard let view else { return nil }
+        if let host = view as? LiquidGlassSurfaceHost { return host }
+        for child in view.subviews {
+            if let host = findSurfaceHost(in: child) { return host }
+        }
+        return nil
+    }
+
+    private func displayContaining(_ frame: NSRect) -> NSScreen? {
+        let center = NSPoint(x: frame.midX, y: frame.midY)
+        return NSScreen.screens.first { $0.frame.contains(center) }
+    }
+
+    private func frameDescription(_ frame: NSRect) -> String {
+        String(format: "{{%.2f,%.2f},{%.2f,%.2f}}", frame.minX, frame.minY, frame.width, frame.height)
     }
 
     private func installObservers() {
@@ -149,6 +252,22 @@ final class IslandWindowController {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.reposition() }
         })
+        observers.append(NotificationCenter.default.addObserver(
+            forName: .lockTuneIslandGeometryStateChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.reposition()
+                // The state notification marks the start of the shared SwiftUI
+                // animation. Validate again after the longest 0.38s morph so
+                // each final state has a recorded surface-global top error.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
+                    MainActor.assumeIsolated { self?.reposition() }
+                }
+            }
+        })
     }
 
     private func installEscapeMonitor() {
@@ -188,8 +307,14 @@ final class IslandWindowController {
 }
 
 private final class IslandPanel: NSPanel {
+    var allowsTopSafeArea = false
+
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
+
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
+        allowsTopSafeArea ? frameRect : super.constrainFrameRect(frameRect, to: screen)
+    }
 
     override func sendEvent(_ event: NSEvent) {
         // A nonactivating status-bar panel does not reliably deliver SwiftUI's
@@ -222,6 +347,35 @@ extension NSScreen {
     var hardwareNotchWidth: CGFloat {
         guard let left = auxiliaryTopLeftArea, let right = auxiliaryTopRightArea else { return 0 }
         return max(0, right.minX - left.maxX)
+    }
+
+    var islandDisplayGeometry: IslandDisplayGeometry? {
+        guard let displayID = lockTuneDisplayID else { return nil }
+        let attachment: IslandAttachment = hasHardwareNotch ? .notchAttached : .floatingCapsule
+        return IslandDisplayGeometry(
+            displayID: displayID,
+            frame: IslandRect(
+                x: Double(frame.minX), y: Double(frame.minY),
+                width: Double(frame.width), height: Double(frame.height)
+            ),
+            visibleFrame: IslandRect(
+                x: Double(visibleFrame.minX), y: Double(visibleFrame.minY),
+                width: Double(visibleFrame.width), height: Double(visibleFrame.height)
+            ),
+            safeAreaInsets: IslandEdgeInsets(
+                top: Double(safeAreaInsets.top),
+                left: Double(safeAreaInsets.left),
+                bottom: Double(safeAreaInsets.bottom),
+                right: Double(safeAreaInsets.right)
+            ),
+            auxiliaryTopLeftArea: auxiliaryTopLeftArea.map {
+                IslandRect(x: Double($0.minX), y: Double($0.minY), width: Double($0.width), height: Double($0.height))
+            },
+            auxiliaryTopRightArea: auxiliaryTopRightArea.map {
+                IslandRect(x: Double($0.minX), y: Double($0.minY), width: Double($0.width), height: Double($0.height))
+            },
+            attachment: attachment
+        )
     }
 }
 
@@ -463,7 +617,9 @@ private struct IslandView: View {
         )
     }
     private var resolvedWidth: CGFloat {
-        let availableWidth = targetScreen.map { Double(max(0, $0.visibleFrame.width - 32)) }
+        let availableWidth = session.islandDisplayGeometry.map {
+            Double(max(0, $0.visibleFrame.width - 32))
+        }
         return CGFloat(coordinator.resolvedWidth(
             for: geometry,
             attachment: session.islandAttachment,
@@ -472,14 +628,10 @@ private struct IslandView: View {
         ))
     }
     private var notchClearance: CGFloat {
-        min(32, CGFloat(geometry.height) * 0.42)
-    }
-    private var targetScreen: NSScreen? {
-        if let preferredID = session.preferredIslandDisplayID,
-           let preferred = NSScreen.screens.first(where: { $0.lockTuneDisplayID.map(String.init) == preferredID }) {
-            return preferred
-        }
-        return NSScreen.main ?? NSScreen.screens.first
+        min(
+            CGFloat(geometry.height),
+            CGFloat(session.islandDisplayGeometry?.hardwareNotchHeight ?? 0)
+        )
     }
     private var containerAnimation: Animation? {
         animation(for: expansionState)
@@ -520,6 +672,11 @@ private struct IslandView: View {
         withAnimation(animation(for: state)) {
             expansionState = state
         }
+        NotificationCenter.default.post(
+            name: .lockTuneIslandGeometryStateChanged,
+            object: nil,
+            userInfo: ["state": state.rawValue]
+        )
     }
     private var progress: Double {
         guard let duration = session.playback.duration, duration > 0 else { return 0 }

@@ -35,8 +35,13 @@ final class AppSession {
     var liquidGlassRuntimeMode: LiquidGlassRuntimeMode = .notEvaluated
     var preferredIslandDisplayID: String?
     var availableIslandDisplays: [IslandDisplay] = []
-    var islandAttachment: IslandAttachment = .floatingCapsule
-    var islandHardwareNotchWidth: Double = 0
+    var islandDisplayGeometry: IslandDisplayGeometry?
+    var islandAttachment: IslandAttachment {
+        islandDisplayGeometry?.attachment ?? .floatingCapsule
+    }
+    var islandHardwareNotchWidth: Double {
+        islandDisplayGeometry?.hardwareNotchWidth ?? 0
+    }
     /// Transient capability reported after the Island panel installs its
     /// five active-appearance overrides; this is never persisted.
     var islandActiveAppearanceOverrideAvailable = false
@@ -583,12 +588,10 @@ final class AppSession {
 
     func updateIslandDisplayEnvironment(
         displays: [IslandDisplay],
-        attachment: IslandAttachment,
-        hardwareNotchWidth: Double
+        geometry: IslandDisplayGeometry
     ) {
         availableIslandDisplays = displays
-        islandAttachment = attachment
-        islandHardwareNotchWidth = hardwareNotchWidth
+        islandDisplayGeometry = geometry
     }
 
     func setIslandActiveAppearanceOverrideAvailable(_ available: Bool) {
