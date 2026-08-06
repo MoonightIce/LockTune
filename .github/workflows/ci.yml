@@ -8,7 +8,12 @@ on:
 
 jobs:
   test-and-build:
-    runs-on: macos-15
+    # The Island's glass host references NSGlassEffectView directly, which only
+    # exists in the macOS 26 SDK. @available guards runtime availability but not
+    # the compile-time symbol, so an older SDK fails to find the type at all.
+    # macos-26 is arm64-only; building x86_64 stays a cross-compile, which is
+    # what the local Apple Silicon build already does.
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
 
