@@ -21,6 +21,7 @@ struct ContentView: View {
                             Button { selection = item } label: {
                                 Label(item.title, systemImage: item.systemImage)
                                     .font(.system(size: 14, weight: selection == item ? .semibold : .regular))
+                                    .foregroundStyle(selection == item ? Color.primary : Color.secondary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(.horizontal, 15).frame(height: 46)
                                     .background(selection == item ? Color.white.opacity(0.9) : .clear,
@@ -68,7 +69,7 @@ private struct MusicLibraryView: View {
                 Menu { Picker("library.browse", selection: $browseMode) { ForEach(LibraryBrowseMode.allCases) { Label($0.title, systemImage: $0.systemImage).tag($0) } } } label: { Label(browseMode.title, systemImage: browseMode.systemImage) }.menuStyle(.borderlessButton)
                 Button("library.refresh", systemImage: "arrow.clockwise") { Task { await session.scanMusicFolders() } }.labelStyle(.iconOnly).disabled(session.musicFolders.isEmpty || session.isScanningMusic)
                 Button("library.addFolder", systemImage: "folder.badge.plus") { Task { await session.chooseMusicFolder() } }.labelStyle(.iconOnly).disabled(session.isScanningMusic)
-                Button("文件信息修复", systemImage: "text.badge.plus") { Task { await session.repairMusicMetadata() } }.labelStyle(.titleAndIcon).disabled(!session.canRepairMusicMetadata() || session.isScanningMusic)
+                Button("文件信息修复", systemImage: "text.badge.plus") { Task { await session.repairMusicMetadata() } }.labelStyle(.titleAndIcon).buttonStyle(.bordered).help("根据文件名修复 MP3 标题、艺人和专辑信息").disabled(!session.canRepairMusicMetadata() || session.isScanningMusic)
                 Button { withAnimation(.easeInOut(duration: 0.2)) { isCalendarPanelVisible.toggle() } } label: { Label(isCalendarPanelVisible ? "隐藏日历" : "显示日历", systemImage: isCalendarPanelVisible ? "calendar.badge.minus" : "calendar.badge.plus") }.buttonStyle(.bordered)
                 Spacer()
                 TextField("搜索音乐", text: $searchText).textFieldStyle(.roundedBorder).frame(width: 180)
@@ -83,6 +84,7 @@ private struct MusicLibraryView: View {
                     }.padding(.horizontal, 30).padding(.top, 27).padding(.bottom, 20)
                     if session.musicLibrary.tracks.isEmpty {
                         ContentUnavailableView { Label("sidebar.library", systemImage: "music.note.list") } description: { Text("placeholder.library") } actions: { Button("library.addFolder", systemImage: "folder.badge.plus") { Task { await session.chooseMusicFolder() } } }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
                         List(selection: $selectedTrackID) {
                             ForEach(sortedRows) { row in
@@ -103,10 +105,14 @@ private struct MusicLibraryView: View {
                                 .simultaneousGesture(TapGesture(count: 2).onEnded { Task { await session.play(trackID: track.id) } })
                             }
                         }.listStyle(.plain).scrollContentBackground(.hidden).background(Color.white)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
-                }.frame(maxWidth: .infinity).background(Color.white)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .background(Color.white)
                 if isCalendarPanelVisible { Divider(); CompactCalendarPanel(session: session).frame(width: 310) }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .overlay(alignment: .topTrailing) {
             if let progress = session.musicScanProgress {
@@ -392,11 +398,17 @@ private struct NowPlayingView: View {
     var body: some View {
         Group {
             if session.playback.queue.isEmpty {
-                ContentUnavailableView(
-                    "sidebar.nowPlaying",
-                    systemImage: "play.circle",
-                    description: Text("placeholder.nowPlaying")
-                )
+                VStack(spacing: 16) {
+                    Image(systemName: "play.circle")
+                        .font(.system(size: 42))
+                        .foregroundStyle(.secondary)
+                    Text("尚未播放")
+                        .font(.system(size: 28, weight: .semibold, design: .rounded))
+                    Text("从音乐库双击一首歌曲后，播放队列和当前歌曲会显示在这里。")
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(nsColor: .windowBackgroundColor))
             } else {
                 List(Array(session.playback.queue.enumerated()), id: \.element.id) { index, item in
                     HStack(spacing: 12) {
@@ -422,6 +434,11 @@ private struct NowPlayingView: View {
                             .foregroundStyle(.secondary)
                     }
                     .contentShape(Rectangle())
+                    .listRowBackground(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .fill(index == session.playback.currentIndex ? Color.accentColor.opacity(0.12) : .clear)
+                            .padding(.horizontal, 8)
+                    )
                     .onTapGesture(count: 2) {
                         Task { await session.playQueueItem(at: index) }
                     }
@@ -788,6 +805,8 @@ private struct PlayerBar: View {
                     Task { await session.playPrevious() }
                 }
                 .labelStyle(.iconOnly)
+                .buttonStyle(.plain)
+                .frame(width: 34, height: 34)
                 .disabled(session.playback.currentItem == nil || session.playback.phase == .loading)
 
                 Button("player.shuffle", systemImage: "shuffle") {
@@ -798,6 +817,8 @@ private struct PlayerBar: View {
                     }
                 }
                 .labelStyle(.iconOnly)
+                .buttonStyle(.plain)
+                .frame(width: 34, height: 34)
                 .foregroundStyle(session.playback.order == .shuffled ? Color.accentColor : Color.secondary)
                 .disabled(session.playback.queue.count < 2)
 
@@ -805,19 +826,26 @@ private struct PlayerBar: View {
                     Task { await session.togglePlayPause() }
                 }
                 .labelStyle(.iconOnly)
-                .controlSize(.large)
+                .buttonStyle(.plain)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.primary)
+                .frame(width: 34, height: 34)
                 .disabled(!canTogglePlayback)
 
                 Button("player.next", systemImage: "forward.fill") {
                     Task { await session.playNext() }
                 }
                 .labelStyle(.iconOnly)
+                .buttonStyle(.plain)
+                .frame(width: 34, height: 34)
                 .disabled(session.playback.currentItem == nil || session.playback.phase == .loading)
 
                 Button(repeatLabel, systemImage: repeatImage) {
                     Task { await session.setRepeatMode(nextRepeatMode) }
                 }
                 .labelStyle(.iconOnly)
+                .buttonStyle(.plain)
+                .frame(width: 34, height: 34)
                 .foregroundStyle(session.playback.repeatMode == .off ? Color.secondary : Color.accentColor)
                 .disabled(session.playback.queue.isEmpty)
 
@@ -850,8 +878,9 @@ private struct PlayerBar: View {
                 .frame(width: 90)
             }
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 22)
+        .padding(.vertical, 14)
+        .background(Color.white)
     }
 
     @ViewBuilder

@@ -25,10 +25,9 @@ The requested scopes are read-only:
 Contributors can create their own Google Desktop OAuth client and set both
 credential build-setting overrides. For example:
 
-    xcodebuild -project LockTune.xcodeproj -scheme LockTune \
-      -configuration Debug -destination 'platform=macOS' \
+    scripts/build-app.sh Debug \
       LOCKTUNE_GOOGLE_CLIENT_ID='example.apps.googleusercontent.com' \
-      LOCKTUNE_GOOGLE_CLIENT_SECRET='example-client-secret' build
+      LOCKTUNE_GOOGLE_CLIENT_SECRET='example-client-secret'
 
 Do not commit account tokens or generated credentials. OAuth tokens are stored
 only in the user's Keychain; calendar events are held in a rebuildable local

@@ -27,6 +27,27 @@ final class AppSession {
     var musicScanProgress: MusicScanProgress?
     var currentArtworkData: Data?
     var isIslandEnabled: Bool
+    var glassTint: Double
+    var glassBackingLevel: GlassBackingLevel
+    var glassRefraction: Double
+    var glassMotionEnabled: Bool
+    var privateRefractionEnabled: Bool
+    var liquidGlassRuntimeMode: LiquidGlassRuntimeMode = .notEvaluated
+    var preferredIslandDisplayID: String?
+    var availableIslandDisplays: [IslandDisplay] = []
+    var islandDisplayGeometry: IslandDisplayGeometry?
+    /// The reference height is session-scoped so a floating display keeps the
+    /// same collapsed rhythm as the last real hardware-notch geometry.
+    var islandCollapsedReferenceHeight: Double = 32
+    var islandAttachment: IslandAttachment {
+        islandDisplayGeometry?.attachment ?? .floatingCapsule
+    }
+    var islandHardwareNotchWidth: Double {
+        islandDisplayGeometry?.hardwareNotchWidth ?? 0
+    }
+    /// Transient capability reported after the Island panel installs its
+    /// five active-appearance overrides; this is never persisted.
+    var islandActiveAppearanceOverrideAvailable = false
     var lastMusicScan: Date? { musicLibrary.scanState.lastCompletedAt }
     var musicLibraryError: String?
     var musicLibraryNotice: String?
@@ -57,6 +78,33 @@ final class AppSession {
     init() {
         let islandPreference = UserDefaults.standard.object(forKey: "island.enabled") as? Bool
         isIslandEnabled = islandPreference ?? true
+        glassTint = UserDefaults.standard.object(forKey: "glass.tint") as? Double ?? 0
+        if let savedBackingLevel = UserDefaults.standard.object(forKey: "glass.backingLevel") as? Int {
+            glassBackingLevel = GlassBackingLevel(rawValue: savedBackingLevel) ?? .light
+        } else if let legacyBlur = UserDefaults.standard.object(forKey: "glass.blur") as? Double {
+            glassBackingLevel = GlassBackingLevel(migratingLegacyBlur: legacyBlur)
+        } else {
+            glassBackingLevel = .clear
+        }
+        let persistedRefraction = UserDefaults.standard.object(forKey: "glass.refraction") as? Double
+        let migratedRefraction: Double
+        if let persistedRefraction {
+            migratedRefraction = min(max(
+                persistedRefraction > 6
+                    ? (persistedRefraction / 160 * 6).rounded()
+                    : persistedRefraction,
+                0
+            ), 6)
+            if persistedRefraction > 6 {
+                UserDefaults.standard.set(migratedRefraction, forKey: "glass.refraction")
+            }
+        } else {
+            migratedRefraction = 6
+        }
+        glassRefraction = migratedRefraction
+        glassMotionEnabled = UserDefaults.standard.object(forKey: "glass.motion") as? Bool ?? true
+        privateRefractionEnabled = UserDefaults.standard.object(forKey: "glass.privateRefractionEnabled") as? Bool ?? true
+        preferredIslandDisplayID = UserDefaults.standard.string(forKey: "island.preferredDisplayID")
         let clientID = Bundle.main.object(forInfoDictionaryKey: "LockTuneGoogleClientID") as? String ?? ""
         let clientSecret = Bundle.main.object(forInfoDictionaryKey: "LockTuneGoogleClientSecret") as? String ?? ""
         let oauthConfiguration = GoogleOAuthConfiguration(clientID: clientID, clientSecret: clientSecret)
@@ -187,7 +235,7 @@ final class AppSession {
 
     var islandPresentation: IslandPresentation {
         islandCoordinator.presentation(for: IslandContext(
-            isMusicPlaying: playback.phase == .playing,
+            hasCurrentTrack: playback.currentItem != nil,
             minutesUntilMeeting: nextMeeting.map {
                 max(0, Int(ceil($0.start.timeIntervalSinceNow / 60)))
             }
@@ -530,6 +578,60 @@ final class AppSession {
     func setIslandEnabled(_ enabled: Bool) {
         isIslandEnabled = enabled
         UserDefaults.standard.set(enabled, forKey: "island.enabled")
+    }
+
+    func setPreferredIslandDisplayID(_ displayID: String?) {
+        preferredIslandDisplayID = displayID
+        if let displayID {
+            UserDefaults.standard.set(displayID, forKey: "island.preferredDisplayID")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "island.preferredDisplayID")
+        }
+    }
+
+    func updateIslandDisplayEnvironment(
+        displays: [IslandDisplay],
+        geometry: IslandDisplayGeometry
+    ) {
+        availableIslandDisplays = displays
+        islandDisplayGeometry = geometry
+        if geometry.hardwareNotchHeight > 0 {
+            islandCollapsedReferenceHeight = geometry.hardwareNotchHeight
+        }
+    }
+
+    func setIslandActiveAppearanceOverrideAvailable(_ available: Bool) {
+        islandActiveAppearanceOverrideAvailable = available
+    }
+
+    func setGlassTint(_ value: Double) {
+        glassTint = value
+        UserDefaults.standard.set(value, forKey: "glass.tint")
+    }
+
+    func setGlassBackingLevel(_ level: GlassBackingLevel) {
+        glassBackingLevel = level
+        UserDefaults.standard.set(level.rawValue, forKey: "glass.backingLevel")
+    }
+
+    func setGlassRefraction(_ value: Double) {
+        glassRefraction = min(max(value.rounded(), 0), 6)
+        UserDefaults.standard.set(glassRefraction, forKey: "glass.refraction")
+    }
+
+    func setGlassMotionEnabled(_ enabled: Bool) {
+        glassMotionEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "glass.motion")
+    }
+
+    func setPrivateRefractionEnabled(_ enabled: Bool) {
+        privateRefractionEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "glass.privateRefractionEnabled")
+    }
+
+    func setLiquidGlassRuntimeMode(_ mode: LiquidGlassRuntimeMode) {
+        guard liquidGlassRuntimeMode != mode else { return }
+        liquidGlassRuntimeMode = mode
     }
 
     func resumeAfterWake() async {
