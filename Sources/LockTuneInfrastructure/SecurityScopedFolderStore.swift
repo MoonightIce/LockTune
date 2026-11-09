@@ -3,6 +3,18 @@ import Foundation
 public protocol SecurityScopedBookmarking {
     func create(for url: URL) throws -> Data
     func resolve(_ data: Data) throws -> (url: URL, isStale: Bool)
+    func startAccessing(_ url: URL) -> Bool
+    func stopAccessing(_ url: URL)
+}
+
+public extension SecurityScopedBookmarking {
+    func startAccessing(_ url: URL) -> Bool {
+        url.startAccessingSecurityScopedResource()
+    }
+
+    func stopAccessing(_ url: URL) {
+        url.stopAccessingSecurityScopedResource()
+    }
 }
 
 public struct SystemSecurityScopedBookmarking: SecurityScopedBookmarking {
@@ -70,13 +82,8 @@ public final class SecurityScopedFolderStore {
         for bookmark in storedBookmarks {
             do {
                 let resolution = try bookmarker.resolve(bookmark)
-                let url = resolution.url
-                urls.append(url)
-                if resolution.isStale {
-                    refreshed.append(try bookmarker.create(for: url))
-                } else {
-                    refreshed.append(bookmark)
-                }
+                urls.append(resolution.url)
+                refreshed.append(current(bookmark, resolution))
             } catch {
                 failedBookmarkCount += 1
             }
@@ -96,16 +103,28 @@ public final class SecurityScopedFolderStore {
             guard let resolution = try? bookmarker.resolve(bookmark),
                   resolution.url.standardizedFileURL != normalized
             else { return nil }
-            if resolution.isStale {
-                return try? bookmarker.create(for: resolution.url)
-            }
-            return bookmark
+            return current(bookmark, resolution)
         }
         defaults.set(retained, forKey: key)
     }
 
     public func removeAll() {
         defaults.removeObject(forKey: key)
+    }
+
+    /// Returns the bookmark to keep for a resolved folder. A stale bookmark
+    /// (folder renamed or moved) is regenerated, which the sandbox only allows
+    /// while the resolved URL's security scope is held. If regeneration still
+    /// fails, the stale bookmark is kept: it keeps resolving, so dropping it
+    /// would silently forget the folder on the next launch.
+    private func current(
+        _ bookmark: Data,
+        _ resolution: (url: URL, isStale: Bool)
+    ) -> Data {
+        guard resolution.isStale else { return bookmark }
+        let accessing = bookmarker.startAccessing(resolution.url)
+        defer { if accessing { bookmarker.stopAccessing(resolution.url) } }
+        return (try? bookmarker.create(for: resolution.url)) ?? bookmark
     }
 
     private var storedBookmarks: [Data] {
